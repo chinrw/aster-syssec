@@ -1,0 +1,83 @@
+{
+  "nodes": {
+    "asterinas-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787316971,
+        "narHash": "sha256-IY07gUAdSjLf04SAhyHXk5+aniVoltMmXoZ++LwrVi8=",
+        "owner": "asterinas",
+        "repo": "asterinas",
+        "rev": "604948581512d83734377974d4c34adb4530f2d7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "asterinas",
+        "repo": "asterinas",
+        "rev": "604948581512d83734377974d4c34adb4530f2d7",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1787360063,
+        "narHash": "sha256-dt4WdcvsA8/RCe+VZZwqU0X+XMM3wBbGCWA0/sFWzGo=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "2c423e03bbafcff28bfadc6781a4a8257f205cb5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "asterinas-src": "asterinas-src",
+        "nixpkgs": "nixpkgs",
+        "rust-overlay": "rust-overlay",
+        "syzkaller-src": "syzkaller-src"
+      }
+    },
+    "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787454509,
+        "narHash": "sha256-r4LDUF+zmJnkftvCVkCrUhSJazsf6EVJF+V2l4/MYbI=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "f60c1b57ff805a46b5175c76fc981fb4f81efbcc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "syzkaller-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786970063,
+        "narHash": "sha256-ejjQwGe8fenFBuuHCGDAaaFbXq03sL6/OFjit2zxLkg=",
+        "owner": "google",
+        "repo": "syzkaller",
+        "rev": "1e72964b0111319984575e60f266d1fa0a98abb5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "google",
+        "repo": "syzkaller",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

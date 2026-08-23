@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/trace-event.schema.json",
+  "title": "Asterinas syscall security trace event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["seq", "cpu", "pid", "tid", "syscall", "event", "object", "phase", "result"],
+  "properties": {
+    "seq": { "type": "integer", "minimum": 0 },
+    "cpu": { "type": "integer", "minimum": 0 },
+    "pid": { "type": "integer", "minimum": 0 },
+    "tid": { "type": "integer", "minimum": 0 },
+    "syscall": { "type": "string", "minLength": 1 },
+    "event": {
+      "enum": [
+        "syscall_enter", "syscall_exit", "copyin_begin", "copyin_end", "copyin_fault",
+        "copyout_begin", "copyout_end", "copyout_fault", "permission_check",
+        "fd_lookup", "fd_install", "fd_remove", "object_acquire", "object_release",
+        "vma_map", "vma_unmap", "vma_protect", "wait_enqueue", "wait_wake",
+        "wait_cancel", "message_consume", "credential_transition", "commit", "rollback",
+        "object_destroy"
+      ]
+    },
+    "object": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*:[A-Za-z0-9._-]+$",
+      "description": "Opaque identity; raw kernel addresses are forbidden."
+    },
+    "phase": { "type": "string", "minLength": 1 },
+    "result": { "type": "string", "minLength": 1 },
+    "detail": { "type": "object" }
+  }
+}

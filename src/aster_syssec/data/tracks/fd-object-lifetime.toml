@@ -1,0 +1,28 @@
+id = "fd-object-lifetime"
+description = "Descriptor reuse, object identity, readiness, and cleanup"
+syscalls = [
+  "close", "close_range", "dup", "dup2", "dup3", "fcntl", "poll", "ppoll",
+  "select", "pselect6", "epoll_create", "epoll_create1", "epoll_ctl",
+  "epoll_wait", "epoll_pwait", "epoll_pwait2", "pidfd_getfd", "eventfd",
+  "eventfd2", "signalfd", "signalfd4", "timerfd_create", "timerfd_settime",
+  "timerfd_gettime",
+]
+source_roots = [
+  "kernel/core/src/syscall/close.rs",
+  "kernel/core/src/syscall/dup.rs",
+  "kernel/core/src/syscall/fcntl.rs",
+  "kernel/core/src/syscall/epoll.rs",
+  "kernel/core/src/fs/file/file_table.rs",
+  "kernel/core/src/events/epoll",
+]
+properties = [
+  "OBJECT-IDENTITY-STABILITY",
+  "NO-STALE-ACCESS",
+  "FAILURE-ATOMICITY",
+  "EXACTLY-ONCE-COMPLETION",
+  "NO-BLOCK-IN-ATOMIC-CONTEXT",
+]
+engines = ["static", "loom", "specula", "kernel-fuzz", "differential"]
+guidance = "guidance/02-fd-object-lifecycle.md"
+specula_readiness = "analysis-only-narrow-before-specgen"
+target = "asterinas-fd-object-lifetime|asterinas/asterinas|Rust|Linux FD identity and readiness semantics"

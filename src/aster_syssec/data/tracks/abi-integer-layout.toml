@@ -1,0 +1,18 @@
+id = "abi-integer-layout"
+description = "Raw ABI conversion, integer ranges, flags, UAPI layout, and output bytes"
+applies_to_all = true
+syscalls = []
+source_roots = [
+  "kernel/core/src/syscall/mod.rs",
+  "kernel/core/src/syscall/arch",
+  "kernel/core/src/syscall",
+]
+properties = [
+  "BOUNDARY-VALIDATION",
+  "NO-UNINITIALIZED-COPYOUT",
+  "LINUX-ABI-CONTRACT",
+]
+engines = ["static", "kani", "miri", "layout", "differential"]
+guidance = "guidance/07-abi-integers-output.md"
+specula_readiness = "analysis-only"
+target = "asterinas-syscall-abi|asterinas/asterinas|Rust|Linux syscall ABI conversion and output semantics"

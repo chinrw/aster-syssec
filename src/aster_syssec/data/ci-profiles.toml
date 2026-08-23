@@ -1,0 +1,31 @@
+version = 1
+
+[profiles.pr]
+implemented_commands = ["inventory --check", "review --changed-from"]
+blocking = [
+  "structural catalog drift",
+  "baseline dispatch or coverage regression",
+  "known candidate policy selected by --fail-on-candidates",
+]
+external_required = ["make check", "targeted regression", "known reproducer replay"]
+
+[profiles.nightly]
+implemented_commands = ["inventory --check", "review"]
+external_required = [
+  "full Kani", "Miri host tests", "Loom models", "SMP regression",
+  "LTP", "kselftest", "gVisor", "differential corpus",
+]
+
+[profiles.weekly]
+implemented_commands = ["model --stage analysis"]
+external_required = [
+  "human Gate 1 review", "kernel sequence fuzzing", "xfstests",
+  "fault injection", "cross-architecture replay",
+]
+
+[profiles.release]
+implemented_commands = ["inventory --check --baseline"]
+external_required = [
+  "confirmed reproducer replay", "regression promotion audit",
+  "cross-architecture UAPI layout lock", "untriaged crash audit",
+]

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/specula-handoff.schema.json",
+  "title": "Gated Specula handoff",
+  "type": "object",
+  "required": [
+    "schema_version", "ready", "blockers", "stage", "track",
+    "specula_readiness", "requires_human_gate_after_stage", "source",
+    "artifact", "execution_identity", "next_gate"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "ready": { "type": "boolean" },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "stage": { "enum": ["dry-run", "analysis"] },
+    "track": { "type": "string" },
+    "specula_readiness": { "type": "string" },
+    "requires_human_gate_after_stage": { "const": true },
+    "source": { "type": "object" },
+    "artifact": { "type": "string" },
+    "source_export": { "type": ["object", "null"] },
+    "execution_identity": { "type": "object" },
+    "direct_command": { "type": ["string", "null"] },
+    "nix_command": { "type": ["string", "null"] },
+    "next_gate": { "type": "string" }
+  }
+}

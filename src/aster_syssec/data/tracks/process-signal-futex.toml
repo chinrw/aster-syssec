@@ -1,0 +1,27 @@
+id = "process-signal-futex"
+description = "Task lifecycle, signal delivery, waits, futexes, and restart"
+syscalls = [
+  "clone", "clone3", "fork", "vfork", "execve", "execveat", "exit",
+  "exit_group", "wait4", "waitid", "kill", "tkill", "tgkill",
+  "pidfd_send_signal", "rt_sigaction", "rt_sigprocmask", "rt_sigpending",
+  "rt_sigtimedwait", "rt_sigsuspend", "futex", "set_robust_list",
+  "set_tid_address", "nanosleep", "clock_nanosleep",
+]
+source_roots = [
+  "kernel/core/src/syscall/clone.rs",
+  "kernel/core/src/syscall/execve.rs",
+  "kernel/core/src/syscall/exit.rs",
+  "kernel/core/src/syscall/futex.rs",
+  "kernel/core/src/process/signal",
+  "kernel/core/src/process/posix_thread/futex.rs",
+]
+properties = [
+  "FAILURE-ATOMICITY",
+  "EXACTLY-ONCE-COMPLETION",
+  "OBJECT-IDENTITY-STABILITY",
+  "RESOURCE-ACCOUNTING-BALANCE",
+]
+engines = ["static", "loom", "specula", "ltp", "kselftest", "kernel-fuzz"]
+guidance = "guidance/04-process-signal-futex.md"
+specula_readiness = "analysis-only-narrow-before-specgen"
+target = "asterinas-process-signal-futex|asterinas/asterinas|Rust|Linux process signal and futex lifecycle semantics"

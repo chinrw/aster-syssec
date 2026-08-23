@@ -1,0 +1,26 @@
+id = "socket-cmsg-iovec"
+description = "Socket message metadata, ancillary data, queues, and FD transfer"
+syscalls = [
+  "socket", "socketpair", "bind", "listen", "accept", "accept4", "connect",
+  "shutdown", "sendto", "recvfrom", "sendmsg", "recvmsg", "sendmmsg",
+  "getsockopt", "setsockopt",
+]
+source_roots = [
+  "kernel/core/src/syscall/sendmsg.rs",
+  "kernel/core/src/syscall/recvmsg.rs",
+  "kernel/core/src/syscall/sendmmsg.rs",
+  "kernel/core/src/syscall/recvfrom.rs",
+  "kernel/core/src/util/net",
+  "kernel/core/src/net/socket",
+]
+properties = [
+  "BOUNDARY-VALIDATION",
+  "NO-UNINITIALIZED-COPYOUT",
+  "FAILURE-ATOMICITY",
+  "OBJECT-IDENTITY-STABILITY",
+  "PARTIAL-PROGRESS-CONSISTENCY",
+]
+engines = ["static", "kani", "miri", "fuzz", "differential", "specula", "kernel-fuzz"]
+guidance = "guidance/06-socket-ancillary-data.md"
+specula_readiness = "analysis-only-narrow-before-specgen"
+target = "asterinas-socket-cmsg-iovec|asterinas/asterinas|Rust|Linux socket ancillary-data commit semantics"

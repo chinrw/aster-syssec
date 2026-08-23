@@ -1,0 +1,24 @@
+id = "vm-page-cache"
+description = "VMA, PTE, page-cache, file-size, and permission transitions"
+syscalls = [
+  "mmap", "munmap", "mprotect", "mremap", "brk", "madvise", "msync",
+  "truncate", "ftruncate", "fallocate", "fork", "clone",
+]
+source_roots = [
+  "kernel/core/src/syscall/mmap.rs",
+  "kernel/core/src/syscall/munmap.rs",
+  "kernel/core/src/syscall/mprotect.rs",
+  "kernel/core/src/syscall/mremap.rs",
+  "kernel/core/src/vm/vmar",
+  "kernel/core/src/vm/page_cache",
+]
+properties = [
+  "BOUNDARY-VALIDATION",
+  "NO-STALE-ACCESS",
+  "FAILURE-ATOMICITY",
+  "OBJECT-IDENTITY-STABILITY",
+]
+engines = ["static", "kani", "specula", "fault-injection", "xfstests", "kernel-fuzz"]
+guidance = "guidance/03-vm-page-cache.md"
+specula_readiness = "analysis-only-narrow-before-specgen"
+target = "asterinas-vm-page-cache|asterinas/asterinas|Rust|Linux VMA and page-cache transition semantics"

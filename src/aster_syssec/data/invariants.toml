@@ -1,0 +1,49 @@
+version = 1
+
+[[properties]]
+id = "BOUNDARY-VALIDATION"
+description = "Attacker-controlled ABI values are validated before use."
+
+[[properties]]
+id = "AUTH-BEFORE-MUTATION"
+description = "Authorization completes before a persistent side effect."
+
+[[properties]]
+id = "OBJECT-IDENTITY-STABILITY"
+description = "An in-flight operation remains bound to the acquired object identity."
+
+[[properties]]
+id = "NO-STALE-ACCESS"
+description = "Revoked or reclaimed objects and mappings cannot remain accessible."
+
+[[properties]]
+id = "FAILURE-ATOMICITY"
+description = "Failure leaves the state required by the syscall-specific contract."
+
+[[properties]]
+id = "PARTIAL-PROGRESS-CONSISTENCY"
+description = "Reported progress matches committed bytes and shared state."
+
+[[properties]]
+id = "EXACTLY-ONCE-COMPLETION"
+description = "A wait, transfer, cleanup, or publication completes at most once."
+
+[[properties]]
+id = "RESOURCE-ACCOUNTING-BALANCE"
+description = "Allocation, publication, rollback, and release keep ownership balanced."
+
+[[properties]]
+id = "NO-UNINITIALIZED-COPYOUT"
+description = "Every byte copied to userspace is initialized, including padding."
+
+[[properties]]
+id = "NO-BLOCK-IN-ATOMIC-CONTEXT"
+description = "Potentially blocking work does not execute while an atomic guard is held."
+
+[[properties]]
+id = "BOUNDED-UNPRIVILEGED-WORK"
+description = "Unprivileged inputs cannot retain unbounded resources or global work."
+
+[[properties]]
+id = "LINUX-ABI-CONTRACT"
+description = "Supported behavior follows the relevant Linux ABI contract."

@@ -1,0 +1,25 @@
+id = "resource-rollback-dos"
+description = "Resource publication, rollback, cleanup, accounting, and retained work"
+syscalls = [
+  "open", "openat", "socket", "socketpair", "accept", "accept4", "pipe",
+  "pipe2", "eventfd", "eventfd2", "timer_create", "timerfd_create",
+  "epoll_create", "epoll_create1", "clone", "clone3", "mmap", "mount",
+  "semget", "inotify_init", "inotify_init1", "memfd_create",
+]
+source_roots = [
+  "kernel/core/src/fs/file/file_table.rs",
+  "kernel/core/src/process",
+  "kernel/core/src/vm",
+  "kernel/core/src/events",
+  "kernel/core/src/syscall",
+]
+properties = [
+  "RESOURCE-ACCOUNTING-BALANCE",
+  "BOUNDED-UNPRIVILEGED-WORK",
+  "FAILURE-ATOMICITY",
+  "EXACTLY-ONCE-COMPLETION",
+]
+engines = ["static", "fault-injection", "specula", "stress", "kernel-fuzz"]
+guidance = "guidance/08-resource-rollback-dos.md"
+specula_readiness = "analysis-only-select-one-resource-family"
+target = "asterinas-resource-rollback|asterinas/asterinas|Rust|Linux syscall resource ownership and rollback semantics"

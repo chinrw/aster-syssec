@@ -1,0 +1,264 @@
+# aster-syssec
+
+`aster-syssec` is an evidence-first syscall security reviewer for Asterinas.
+It reads an Asterinas checkout without modifying it and provides one CLI seam
+for inventory, deterministic candidate review, Asterinas's own agent reviewer,
+and gated Specula preparation.
+
+The first version implements:
+
+- three-architecture syscall dispatch inventory;
+- handler signature, SCML, regression-source, and track reconciliation;
+- structural drift checks and baseline comparisons;
+- eight syscall security tracks and twelve numbered properties;
+- nine static candidate rules over syscall handlers and same-file callees;
+- immutable run manifests and JSON/Markdown evidence;
+- read-only adapters for Asterinas `aster-code-review` and Specula;
+- exact-HEAD export for linked worktrees.
+
+It does not implement Kani, Miri, cargo-fuzz, Loom, differential VM execution,
+fault injection, or kernel fuzzing. `doctor` reports those engines as
+unverified, missing, or not implemented. Their names in a track describe the
+intended verification matrix, not a completed run.
+
+## Install
+
+Python 3.11 or newer is sufficient. Runtime dependencies are from the standard
+library.
+
+The preferred development path is the locked Nix flake:
+
+```sh
+nix develop                 # reviewer development
+nix develop .#formal        # Rust/Miri/Kani installer/fuzz/Specula prerequisites
+nix develop .#kernel-fuzz   # formal shell plus Go/QEMU/syzkaller
+```
+
+The default flake input reads the Rust channel, components, and targets from
+Asterinas revision `604948581512d83734377974d4c34adb4530f2d7`. Override it
+when reviewing another checkout:
+
+```sh
+nix develop \
+  --override-input asterinas-src path:/absolute/path/to/asterinas \
+  .#formal
+```
+
+Kani uses its official two-stage installation. The installer is built and
+hash-pinned by Nix; run this once to download the matching release bundle into
+the isolated cache configured by the shell:
+
+```sh
+nix develop .#formal
+syssec-kani-setup
+kani tests/fixtures/kani_smoke.rs
+```
+
+See [Nix environments](docs/nix-environment.md) for exact shell contents,
+update procedures, and host capabilities that remain external.
+
+Without Nix:
+
+```sh
+uv tool install --editable .
+syssec --help
+```
+
+Without installation:
+
+```sh
+PYTHONPATH=src python3 -m aster_syssec --help
+```
+
+## Quick start
+
+Set explicit source and evidence roots. The tool never writes under the
+Asterinas checkout.
+
+```sh
+ASTERINAS_REPO=/path/to/asterinas
+SYSSEC_WORK_ROOT=/tmp/aster-syssec
+
+syssec doctor \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT"
+
+syssec inventory \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --check
+
+syssec review \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --track socket-cmsg-iovec
+```
+
+Every evidence-producing command creates `run-manifest.json` before other
+outputs. A run is stored under:
+
+```text
+<work-root>/runs/<revision>/<run-id>/
+├── run-manifest.json
+├── catalog/
+├── review/
+├── agent-review/
+└── specula/
+```
+
+## Inventory
+
+`inventory` parses:
+
+- `kernel/core/src/syscall/arch/x86.rs`;
+- the generic RISC-V/LoongArch table in `arch/generic.rs` plus arch additions;
+- `sys_*` handler signatures;
+- SCML call declarations;
+- identifier references in Asterinas regression sources;
+- bundled track and property configuration.
+
+Outputs:
+
+```text
+catalog/syscalls.json
+catalog/drift.json
+catalog/syscall-matrix.md
+```
+
+`--check` fails on structural errors. Existing missing SCML or regression
+references remain warnings so historical debt does not make the reviewer
+unusable. `--strict-coverage` also fails on those warnings.
+
+For PR CI, compare with a catalog generated from the base revision:
+
+```sh
+syssec inventory \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --check \
+  --baseline base-syscalls.json
+```
+
+Baseline comparison fails when:
+
+- a new syscall lacks SCML or a regression reference;
+- a handler, architecture number, or argument count changes;
+- a baseline syscall disappears;
+- baseline SCML or regression evidence is lost.
+
+Regression evidence is an identifier-reference heuristic. It means a test
+source mentions the syscall; it does not mean the test was executed or covers a
+security property.
+
+## Static review
+
+Review one track, explicit files, or a Git change:
+
+```sh
+syssec review --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --track fd-object-lifetime
+
+syssec review --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --path kernel/core/src/syscall/recvmsg.rs
+
+syssec review --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --changed-from origin/main
+```
+
+The backend scans syscall handlers and same-file functions reached by direct
+calls. It does not resolve Rust methods or cross-file call graphs. The report
+separates selected files, files containing scanned code, and functions scanned.
+MIR-backed reachability is a later engine.
+
+Use `--scope selected` for an exhaustive source-path pass. It scans every
+function in the selected files; a match then proves only that the code lies in
+the configured track paths, not that a syscall can reach it.
+
+Use repeatable `--rule` options to isolate one mechanism:
+
+```sh
+syssec review --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --track socket-cmsg-iovec \
+  --scope selected \
+  --rule COPYOUT-AFTER-SIDE-EFFECT \
+  --rule FLAGS-TRUNCATE-UNKNOWN
+```
+
+Rules are documented in [static-rules.md](docs/static-rules.md). Every match is
+written with `status = "candidate"`, `security_impact = null`, and a required
+confirmation step. `--fail-on-candidates` is an explicit CI policy; it does not
+promote candidates to findings.
+
+## Asterinas agent review
+
+The checkout's own `aster-code-review` skill remains the authority for general
+persona-keyed agent review. `aster-syssec` records its hashes and prepares its
+headless launcher without starting an agent:
+
+```sh
+syssec agent-review \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --path kernel/core/src/syscall/recvmsg.rs \
+  --agent-profile codex \
+  --per-persona-context=yes
+```
+
+The run contains `agent-review/handoff.json` and `command.sh`. Execute the
+script only after reviewing its pinned source, profile, target, and output
+path. Diff mode uses `--base <ref>` instead of `--path`.
+
+## Specula handoff
+
+`model` permits only dry-run and analysis in this version. It never starts
+Specula. It hashes the agent config and guidance, fixes a unique run ID, and
+emits the exact command.
+
+```sh
+syssec model \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --specula-profile /path/to/specula-profile \
+  --specula-repo /path/to/specula \
+  --track fd-object-lifetime \
+  --stage dry-run \
+  --export-linked
+```
+
+`--export-linked` is required when `.git` is a linked-worktree file. It creates
+a tracked-file-only `git archive` of exact HEAD under the run directory. It
+refuses the export when tracked working-tree changes would be omitted. Untracked
+files are recorded as excluded inputs.
+
+After analysis, inspect `modeling-brief.md`, `analysis-report.md`, and
+`review-analysis.md`. Spec generation remains blocked until a human accepts one
+shared state machine and one Linux-visible contract.
+
+The files under the supplied `--specula-profile` path are read in place. The
+prepared agent config and guidance are not edited or copied back.
+
+## Exit status
+
+| Status | Meaning |
+| --- | --- |
+| `0` | Command completed and its selected policy passed |
+| `1` | Completed evidence reports drift/candidates/blockers selected by CLI policy |
+| `2` | Invalid input, missing checkout data, or adapter preparation error |
+
+A status of `1` still leaves a completed run manifest and evidence. An
+unexpected exception leaves the manifest marked `failed`.
+
+## Contracts
+
+- [Reviewer contract](docs/reviewer-contract.md)
+- [Threat model](docs/threat-model.md)
+- [Static rules](docs/static-rules.md)
+- [Live validation](VALIDATION.md)
+- [Catalog schema](schemas/syscall-catalog.schema.json)
+- [Finding schema](schemas/finding.schema.json)
+- [Run manifest schema](schemas/run-manifest.schema.json)
+- [Trace event schema](schemas/trace-event.schema.json)

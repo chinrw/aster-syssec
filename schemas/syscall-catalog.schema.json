@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/syscall-catalog.schema.json",
+  "title": "Asterinas syscall catalog",
+  "type": "object",
+  "required": ["schema_version", "source", "syscalls", "drift"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "source": {
+      "type": "object",
+      "required": ["path", "revision", "dirty_hash"],
+      "properties": {
+        "path": { "type": "string" },
+        "revision": { "type": ["string", "null"] },
+        "dirty_hash": { "type": "string" }
+      }
+    },
+    "syscalls": { "type": "array", "items": { "$ref": "#/$defs/syscall" } },
+    "drift": { "type": "array", "items": { "$ref": "#/$defs/drift" } }
+  },
+  "$defs": {
+    "syscall": {
+      "type": "object",
+      "required": ["name", "handler", "architectures", "scml", "regression", "security_tracks"],
+      "properties": {
+        "name": { "type": "string" },
+        "handler": { "type": "string" },
+        "handler_path": { "type": ["string", "null"] },
+        "handler_line": { "type": ["integer", "null"], "minimum": 1 },
+        "architectures": { "type": "object" },
+        "scml": { "type": "object" },
+        "regression": { "type": "object" },
+        "security_tracks": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "drift": {
+      "type": "object",
+      "required": ["kind", "severity", "message"],
+      "properties": {
+        "kind": { "type": "string" },
+        "severity": { "enum": ["error", "warning", "info"] },
+        "message": { "type": "string" },
+        "syscall": { "type": ["string", "null"] },
+        "path": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

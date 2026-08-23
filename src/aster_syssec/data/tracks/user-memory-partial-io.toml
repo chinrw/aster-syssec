@@ -1,0 +1,26 @@
+id = "user-memory-partial-io"
+description = "User-copy faults, nested buffers, partial progress, and restart"
+syscalls = [
+  "read", "write", "readv", "writev", "pread64", "pwrite64", "preadv",
+  "preadv2", "pwritev", "pwritev2", "sendfile", "getdents", "getdents64",
+  "readlink", "readlinkat",
+]
+source_roots = [
+  "kernel/core/src/syscall/read.rs",
+  "kernel/core/src/syscall/write.rs",
+  "kernel/core/src/syscall/pread64.rs",
+  "kernel/core/src/syscall/pwrite64.rs",
+  "kernel/core/src/syscall/preadv.rs",
+  "kernel/core/src/syscall/pwritev.rs",
+  "ostd/src/mm/io",
+]
+properties = [
+  "BOUNDARY-VALIDATION",
+  "FAILURE-ATOMICITY",
+  "PARTIAL-PROGRESS-CONSISTENCY",
+  "EXACTLY-ONCE-COMPLETION",
+]
+engines = ["static", "kani", "fuzz", "fault-injection", "differential", "specula"]
+guidance = "guidance/01-user-memory-partial-io-baseline.md"
+specula_readiness = "analysis-only-narrow-before-specgen"
+target = "asterinas-syscall-user-memory|asterinas/asterinas|Rust|Linux syscall partial-progress and user-memory fault semantics"

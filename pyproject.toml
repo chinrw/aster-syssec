@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aster-syssec"
+version = "0.1.0"
+description = "Evidence-first Asterinas syscall security reviewer"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MPL-2.0"
+authors = [{ name = "chinrw" }]
+dependencies = []
+
+[project.scripts]
+aster-syssec = "aster_syssec.cli:main"
+syssec = "aster_syssec.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+aster_syssec = ["data/*.toml", "data/tracks/*.toml"]
+
+[tool.coverage.run]
+branch = true
+source = ["aster_syssec"]
