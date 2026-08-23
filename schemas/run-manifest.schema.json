@@ -1,23 +1,121 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asterinas.dev/syssec/run-manifest.schema.json",
-  "title": "aster-syssec run manifest",
+  "title": "aster-syssec run lifecycle manifest",
   "type": "object",
+  "additionalProperties": false,
   "required": [
-    "schema_version", "run_id", "command", "started_at", "status", "source",
-    "configuration_hash", "tool_versions", "parameters", "outputs"
+    "schema_version",
+    "run_id",
+    "command",
+    "started_at",
+    "finished_at",
+    "status",
+    "source",
+    "reviewer",
+    "configuration_hash",
+    "tool_versions",
+    "parameters",
+    "outputs",
+    "error"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
-    "run_id": { "type": "string" },
-    "command": { "type": "string" },
+    "schema_version": { "const": 2 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "command": { "type": "string", "minLength": 1 },
     "started_at": { "type": "string", "format": "date-time" },
     "finished_at": { "type": ["string", "null"], "format": "date-time" },
     "status": { "enum": ["running", "completed", "failed"] },
-    "source": { "type": "object" },
-    "configuration_hash": { "type": "string" },
+    "source": { "$ref": "#/$defs/source" },
+    "reviewer": { "$ref": "#/$defs/reviewer" },
+    "configuration_hash": { "$ref": "#/$defs/sha256" },
     "tool_versions": { "type": "object" },
     "parameters": { "type": "object" },
-    "outputs": { "type": "array", "items": { "type": "string" } }
+    "outputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "error": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path", "revision", "branch", "dirty_hash", "dirty_entries", "git_dir_kind"
+      ],
+      "properties": {
+        "path": { "type": "string" },
+        "revision": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "dirty_hash": { "$ref": "#/$defs/sha256" },
+        "dirty_entries": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "git_dir_kind": { "enum": ["directory", "file", "absent"] }
+      }
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "git_commit",
+        "dirty_hash",
+        "content_sha256",
+        "rules_sha256",
+        "schemas_sha256",
+        "flake_lock_sha256",
+        "source"
+      ],
+      "properties": {
+        "version": { "type": "string" },
+        "git_commit": { "type": ["string", "null"] },
+        "dirty_hash": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "content_sha256": { "$ref": "#/$defs/sha256" },
+        "rules_sha256": { "$ref": "#/$defs/sha256" },
+        "schemas_sha256": { "$ref": "#/$defs/sha256" },
+        "flake_lock_sha256": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "source": {
+          "oneOf": [
+            { "$ref": "#/$defs/source" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size", "media_type", "integrity"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size": { "type": "integer", "minimum": 0 },
+        "media_type": { "type": "string", "minLength": 1 },
+        "schema": { "type": "string", "format": "uri" },
+        "schema_sha256": { "$ref": "#/$defs/sha256" },
+        "integrity": { "enum": ["verified", "unverified"] }
+      },
+      "dependentRequired": {
+        "schema": ["schema_sha256"],
+        "schema_sha256": ["schema"]
+      }
+    }
   }
 }

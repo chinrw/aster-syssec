@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aster-syssec"
-version = "0.1.0"
+version = "0.2.0"
 description = "Evidence-first Asterinas syscall security reviewer"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MPL-2.0"
 authors = [{ name = "chinrw" }]
-dependencies = []
+dependencies = [
+  "jsonschema>=4.23,<5",
+  "referencing>=0.35,<1",
+]
 
 [project.scripts]
 aster-syssec = "aster_syssec.cli:main"
@@ -21,6 +24,10 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 aster_syssec = ["data/*.toml", "data/tracks/*.toml"]
+
+[tool.setuptools.data-files]
+"share/aster-syssec" = ["flake.lock"]
+"share/aster-syssec/schemas" = ["schemas/*.json"]
 
 [tool.coverage.run]
 branch = true

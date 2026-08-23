@@ -24,6 +24,7 @@
 
   outputs =
     {
+      self,
       nixpkgs,
       rust-overlay,
       asterinas-src,
@@ -44,10 +45,15 @@
           };
           lib = pkgs.lib;
           python = pkgs.python3;
+          pythonEnv = python.withPackages (pythonPackages: [
+            pythonPackages.jsonschema
+            pythonPackages.referencing
+          ]);
 
           projectSource = lib.fileset.toSource {
             root = ./.;
             fileset = lib.fileset.unions [
+              ./.github
               ./.gitignore
               ./LICENSE
               ./MANIFEST.in
@@ -129,24 +135,42 @@
 
           syssec = python.pkgs.buildPythonApplication {
             pname = "aster-syssec";
-            version = "0.1.0";
+            version = "0.2.0";
             pyproject = true;
             src = projectSource;
 
             build-system = [ python.pkgs.setuptools ];
+            dependencies = [
+              python.pkgs.jsonschema
+              python.pkgs.referencing
+            ];
+            makeWrapperArgs = [
+              "--set"
+              "SYSSEC_BUILD_REVISION"
+              (self.rev or self.dirtyRev or "unknown")
+            ];
             nativeCheckInputs = [
+              pkgs.actionlint
               pkgs.check-jsonschema
               pkgs.git
               pkgs.jq
               pkgs.pyright
+              pkgs.ruff
+              pkgs.shellcheck
+              python.pkgs.jsonschema
+              python.pkgs.referencing
             ];
             doCheck = true;
             checkPhase = ''
               runHook preCheck
-              export PYTHONPATH="$PWD/src"
-              ${python.interpreter} -m unittest discover -v
+              export PYTHONPATH="$PWD/src:${pythonEnv}/${python.sitePackages}"
+              ${pythonEnv.interpreter} -m unittest discover -v
+              ruff check src tests
+              ruff format --check src tests
               pyright src tests
               check-jsonschema --check-metaschema schemas/*.json
+              actionlint .github/workflows/*.yml
+              shellcheck scripts/*.sh
               runHook postCheck
             '';
             pythonImportsCheck = [ "aster_syssec" ];
@@ -161,7 +185,7 @@
 
           syssecDev = pkgs.writeShellApplication {
             name = "syssec-dev";
-            runtimeInputs = [ python ];
+            runtimeInputs = [ pythonEnv ];
             text = ''
               source_root="''${SYSSEC_SOURCE_ROOT:-$PWD}"
               if [ ! -f "$source_root/pyproject.toml" ] || [ ! -d "$source_root/src/aster_syssec" ]; then
@@ -214,12 +238,14 @@
           };
 
           coreTools = with pkgs; [
+            actionlint
             check-jsonschema
             git
             gnumake
             jq
             nixfmt
             pyright
+            pythonEnv
             ripgrep
             ruff
             shellcheck
@@ -253,9 +279,11 @@
           ];
 
           commonShellHook = ''
+            export PATH=${pythonEnv}/bin:$PATH
             cache_root="''${XDG_CACHE_HOME:-$HOME/.cache}/aster-syssec"
             export SYSSEC_WORK_ROOT="''${SYSSEC_WORK_ROOT:-$cache_root/work}"
             export SYSSEC_SOURCE_ROOT="''${SYSSEC_SOURCE_ROOT:-$PWD}"
+            export ASTERINAS_PINNED_SOURCE=${lib.escapeShellArg (toString asterinas-src)}
           '';
 
           formalShellHook = commonShellHook + ''

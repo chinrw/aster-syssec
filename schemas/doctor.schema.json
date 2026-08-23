@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/doctor.schema.json",
+  "title": "aster-syssec environment diagnosis",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "source", "checks", "capabilities"],
+  "properties": {
+    "status": { "enum": ["ok", "warn", "fail"] },
+    "source": { "type": "object" },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "detail", "required"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "enum": ["PASS", "WARN", "FAIL"] },
+          "detail": { "type": "string" },
+          "required": { "type": "boolean" }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

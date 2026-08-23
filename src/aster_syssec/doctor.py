@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import shutil
 import tomllib
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from .config import Registry
+from .config import Registry, validate_registry_against_checkout
+from .handoff import validate_specula_agent_config
 from .inventory import InventoryBuilder
 from .source import inspect_source
 
@@ -52,7 +52,9 @@ def run_doctor(
         Check(
             id="asterinas-layout",
             status="FAIL" if missing else "PASS",
-            detail=f"missing: {', '.join(missing)}" if missing else "required syscall and toolchain files exist",
+            detail=f"missing: {', '.join(missing)}"
+            if missing
+            else "required syscall and toolchain files exist",
             required=True,
         )
     )
@@ -61,7 +63,8 @@ def run_doctor(
         Check(
             id="source-revision",
             status="PASS" if snapshot.revision else "WARN",
-            detail=snapshot.revision or "source is not a Git checkout; provenance is path-only",
+            detail=snapshot.revision
+            or "source is not a Git checkout; provenance uses its content hash",
             required=False,
         )
     )
@@ -75,17 +78,22 @@ def run_doctor(
         except (KeyError, tomllib.TOMLDecodeError) as error:
             checks.append(Check("rust-toolchain", "FAIL", str(error), True))
 
+    catalog = None
     if not missing:
         catalog = InventoryBuilder(source_root, registry).build()
         architecture_counts = {
-            architecture: sum(architecture in item.architectures for item in catalog.syscalls)
+            architecture: sum(
+                architecture in item.architectures for item in catalog.syscalls
+            )
             for architecture in ("x86_64", "riscv64", "loongarch64")
         }
         checks.append(
             Check(
                 id="dispatch-inventory",
                 status="PASS" if all(architecture_counts.values()) else "FAIL",
-                detail=", ".join(f"{key}={value}" for key, value in architecture_counts.items()),
+                detail=", ".join(
+                    f"{key}={value}" for key, value in architecture_counts.items()
+                ),
                 required=True,
             )
         )
@@ -101,7 +109,9 @@ def run_doctor(
         checks.append(
             Check(
                 id="coverage-debt",
-                status="WARN" if any(item.severity == "warning" for item in catalog.drift) else "PASS",
+                status="WARN"
+                if any(item.severity == "warning" for item in catalog.drift)
+                else "PASS",
                 detail=(
                     f"{sum(item.severity == 'warning' for item in catalog.drift)} SCML/test coverage warnings"
                 ),
@@ -114,13 +124,21 @@ def run_doctor(
         "inventory": "available",
         "aster-code-review": (
             "handoff-available"
-            if (source_root / ".agents/skills/aster-code-review/aster_code_review.sh").is_file()
+            if (
+                source_root / ".agents/skills/aster-code-review/aster_code_review.sh"
+            ).is_file()
             else "not-present"
         ),
         "specula-handoff": "configured" if profile_root else "not-configured",
-        "kani": "installed-unverified" if shutil.which("cargo-kani") else "not-installed",
-        "miri": "installed-unverified" if shutil.which("cargo-miri") else "not-installed",
-        "cargo-fuzz": "installed-unverified" if shutil.which("cargo-fuzz") else "not-installed",
+        "kani": "installed-unverified"
+        if shutil.which("cargo-kani")
+        else "not-installed",
+        "miri": "installed-unverified"
+        if shutil.which("cargo-miri")
+        else "not-installed",
+        "cargo-fuzz": "installed-unverified"
+        if shutil.which("cargo-fuzz")
+        else "not-installed",
         "loom": "adapter-not-implemented",
         "differential": "adapter-not-implemented",
         "kernel-fuzz": "adapter-not-implemented",
@@ -142,17 +160,15 @@ def run_doctor(
         guidance = [profile_root / track.guidance for track in registry.tracks.values()]
         if config.is_file():
             try:
-                parsed = json.loads(config.read_text(encoding="utf-8"))
-                required_keys = {"version", "default_profile", "profiles", "phases"}
-                missing_keys = required_keys - set(parsed)
-                if missing_keys:
-                    raise ValueError(f"missing keys: {sorted(missing_keys)}")
+                validate_specula_agent_config(config)
                 detail = f"sha256={_sha256(config)}"
                 checks.append(Check("specula-agent-config", "PASS", detail, True))
-            except (json.JSONDecodeError, ValueError) as error:
+            except (TypeError, ValueError, OSError) as error:
                 checks.append(Check("specula-agent-config", "FAIL", str(error), True))
         else:
-            checks.append(Check("specula-agent-config", "FAIL", f"missing {config}", True))
+            checks.append(
+                Check("specula-agent-config", "FAIL", f"missing {config}", True)
+            )
         missing_guidance = [str(path) for path in guidance if not path.is_file()]
         checks.append(
             Check(
@@ -166,6 +182,16 @@ def run_doctor(
                 required=True,
             )
         )
+
+    checks.extend(
+        Check(issue.id, issue.status, issue.detail, issue.status == "FAIL")
+        for issue in validate_registry_against_checkout(
+            registry,
+            source_root,
+            catalog=catalog,
+            profile_root=profile_root,
+        )
+    )
 
     if specula_repo is not None:
         specula_repo = specula_repo.resolve()

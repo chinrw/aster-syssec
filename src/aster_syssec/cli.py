@@ -4,12 +4,20 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
+from . import __version__
 from .agent_review import prepare_aster_code_review
-from .config import Registry, load_registry, require_tracks
+from .config import (
+    Registry,
+    load_registry,
+    require_tracks,
+    validate_registry_against_checkout,
+)
 from .doctor import run_doctor
+from .handoff import verify_handoff
 from .inventory import InventoryBuilder, compare_baseline
 from .reporting import (
     aggregate_markdown,
@@ -29,19 +37,38 @@ def build_parser() -> argparse.ArgumentParser:
         prog="syssec",
         description="Evidence-first Asterinas syscall security reviewer",
     )
-    parser.add_argument("--version", action="version", version="aster-syssec 0.1.0")
+    parser.add_argument(
+        "--version", action="version", version=f"aster-syssec {__version__}"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    doctor = subparsers.add_parser("doctor", help="validate source, profile, and engine availability")
+    doctor = subparsers.add_parser(
+        "doctor", help="validate source, profile, and engine availability"
+    )
     _add_source_options(doctor)
     doctor.add_argument("--specula-profile", type=Path)
     doctor.add_argument("--specula-repo", type=Path)
-    doctor.add_argument("--json", action="store_true", help="print machine-readable result")
+    doctor.add_argument(
+        "--json", action="store_true", help="print machine-readable result"
+    )
     doctor.set_defaults(handler=_doctor)
 
-    inventory = subparsers.add_parser("inventory", help="build and reconcile the syscall catalog")
+    config_check = subparsers.add_parser(
+        "config-check",
+        help="validate Track configuration against an Asterinas checkout",
+    )
+    _add_source_options(config_check)
+    config_check.add_argument("--specula-profile", type=Path)
+    config_check.add_argument("--json", action="store_true")
+    config_check.set_defaults(handler=_config_check)
+
+    inventory = subparsers.add_parser(
+        "inventory", help="build and reconcile the syscall catalog"
+    )
     _add_source_options(inventory)
-    inventory.add_argument("--check", action="store_true", help="fail on structural drift")
+    inventory.add_argument(
+        "--check", action="store_true", help="fail on structural drift"
+    )
     inventory.add_argument(
         "--baseline",
         type=Path,
@@ -55,10 +82,19 @@ def build_parser() -> argparse.ArgumentParser:
     inventory.add_argument("--json", action="store_true", help="print summary as JSON")
     inventory.set_defaults(handler=_inventory)
 
-    review = subparsers.add_parser("review", help="scan syscall paths and emit security candidates")
+    review = subparsers.add_parser(
+        "review", help="scan syscall paths and emit security candidates"
+    )
     _add_source_options(review)
-    review.add_argument("--track", action="append", default=[], help="security track id; repeatable")
-    review.add_argument("--path", action="append", default=[], help="checkout-relative file or directory")
+    review.add_argument(
+        "--track", action="append", default=[], help="security track id; repeatable"
+    )
+    review.add_argument(
+        "--path",
+        action="append",
+        default=[],
+        help="checkout-relative file or directory",
+    )
     review.add_argument("--changed-from", help="Git base for changed-path review")
     review.add_argument(
         "--scope",
@@ -81,7 +117,9 @@ def build_parser() -> argparse.ArgumentParser:
     review.add_argument("--json", action="store_true", help="print summary as JSON")
     review.set_defaults(handler=_review)
 
-    model = subparsers.add_parser("model", help="prepare a gated Specula dry-run or analysis handoff")
+    model = subparsers.add_parser(
+        "model", help="prepare a gated Specula dry-run or analysis handoff"
+    )
     _add_source_options(model)
     model.add_argument("--track", required=True, help="one security track id")
     model.add_argument("--stage", choices=("dry-run", "analysis"), default="dry-run")
@@ -93,7 +131,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="export exact HEAD when the source is a linked worktree",
     )
-    model.add_argument("--json", action="store_true", help="print machine-readable handoff")
+    model.add_argument(
+        "--json", action="store_true", help="print machine-readable handoff"
+    )
     model.set_defaults(handler=_model)
 
     agent_review = subparsers.add_parser(
@@ -103,7 +143,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_source_options(agent_review)
     target = agent_review.add_mutually_exclusive_group(required=True)
     target.add_argument("--base", help="review merge-base(base, HEAD)..HEAD")
-    target.add_argument("--path", action="append", help="working-tree file or file:line-range")
+    target.add_argument(
+        "--path", action="append", help="working-tree file or file:line-range"
+    )
     agent_review.add_argument("--agent-profile", default="codex")
     agent_review.add_argument(
         "--per-persona-context",
@@ -122,6 +164,14 @@ def build_parser() -> argparse.ArgumentParser:
     tracks.add_argument("--config-root", type=Path)
     tracks.add_argument("--json", action="store_true")
     tracks.set_defaults(handler=_tracks)
+
+    verify = subparsers.add_parser(
+        "verify-handoff",
+        help="fail closed when a prepared handoff identity no longer matches",
+    )
+    verify.add_argument("--handoff", required=True, type=Path)
+    verify.add_argument("--json", action="store_true")
+    verify.set_defaults(handler=_verify_handoff)
     return parser
 
 
@@ -138,7 +188,9 @@ def _add_source_options(parser: argparse.ArgumentParser) -> None:
         default=None,
         help="evidence root; defaults to SYSSEC_WORK_ROOT or ~/.cache/aster-syssec",
     )
-    parser.add_argument("--config-root", type=Path, help="override bundled property/track registry")
+    parser.add_argument(
+        "--config-root", type=Path, help="override bundled property/track registry"
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -146,17 +198,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.handler(args))
-    except (ValueError, OSError, json.JSONDecodeError) as error:
+    except (TypeError, ValueError, OSError, json.JSONDecodeError) as error:
         print(f"syssec: {error}", file=sys.stderr)
         return 2
 
 
 def _doctor(args: argparse.Namespace) -> int:
     registry = load_registry(args.config_root)
-    run = _start_run(args, registry, "doctor", {
-        "specula_profile": _optional_path(args.specula_profile),
-        "specula_repo": _optional_path(args.specula_repo),
-    })
+    run = _start_run(
+        args,
+        registry,
+        "doctor",
+        {
+            "specula_profile": _optional_path(args.specula_profile),
+            "specula_repo": _optional_path(args.specula_repo),
+        },
+    )
     try:
         result = run_doctor(
             args.asterinas,
@@ -164,7 +221,11 @@ def _doctor(args: argparse.Namespace) -> int:
             profile_root=args.specula_profile,
             specula_repo=args.specula_repo,
         )
-        output = run.write_json("doctor/doctor.json", result.to_dict())
+        output = run.write_json(
+            "doctor/doctor.json",
+            result.to_dict(),
+            schema="doctor.schema.json",
+        )
         run.complete([output])
     except BaseException as error:
         run.fail(error)
@@ -174,13 +235,63 @@ def _doctor(args: argparse.Namespace) -> int:
     return 1 if result.status == "fail" else 0
 
 
+def _config_check(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    run = _start_run(
+        args,
+        registry,
+        "config-check",
+        {"specula_profile": _optional_path(args.specula_profile)},
+    )
+    try:
+        ensure_asterinas_checkout(args.asterinas)
+        catalog = InventoryBuilder(args.asterinas, registry).build()
+        issues = validate_registry_against_checkout(
+            registry,
+            args.asterinas,
+            catalog=catalog,
+            profile_root=args.specula_profile,
+        )
+        status = (
+            "fail"
+            if any(item.status == "FAIL" for item in issues)
+            else "warn"
+            if any(item.status == "WARN" for item in issues)
+            else "ok"
+        )
+        result = {
+            "status": status,
+            "issues": [item.__dict__ for item in issues],
+        }
+        output = run.write_json(
+            "config/config-check.json",
+            result,
+            schema="config-check.schema.json",
+        )
+        run.complete([output])
+    except BaseException as error:
+        run.fail(error)
+        raise
+    _print_result(
+        args.json,
+        result,
+        f"config-check: {status}, {len(issues)} issues; run={run.root}",
+    )
+    return 1 if status == "fail" else 0
+
+
 def _inventory(args: argparse.Namespace) -> int:
     registry = load_registry(args.config_root)
-    run = _start_run(args, registry, "inventory", {
-        "check": args.check,
-        "strict_coverage": args.strict_coverage,
-        "baseline": _optional_path(args.baseline),
-    })
+    run = _start_run(
+        args,
+        registry,
+        "inventory",
+        {
+            "check": args.check,
+            "strict_coverage": args.strict_coverage,
+            "baseline": _optional_path(args.baseline),
+        },
+    )
     try:
         ensure_asterinas_checkout(args.asterinas)
         catalog = InventoryBuilder(args.asterinas, registry).build()
@@ -190,11 +301,23 @@ def _inventory(args: argparse.Namespace) -> int:
             catalog = type(catalog)(
                 source=catalog.source,
                 syscalls=catalog.syscalls,
-                drift=tuple((*catalog.drift, *additions)),
+                drift=(*catalog.drift, *additions),
             )
-        catalog_json = run.write_json("catalog/syscalls.json", catalog.to_dict())
-        drift_json = run.write_json("catalog/drift.json", [item.__dict__ for item in catalog.drift])
-        matrix = run.write_text("catalog/syscall-matrix.md", catalog_markdown(catalog))
+        catalog_json = run.write_json(
+            "catalog/syscalls.json",
+            catalog.to_dict(),
+            schema="syscall-catalog.schema.json",
+        )
+        drift_json = run.write_json(
+            "catalog/drift.json",
+            [item.__dict__ for item in catalog.drift],
+            schema="drift-list.schema.json",
+        )
+        matrix = run.write_text(
+            "catalog/syscall-matrix.md",
+            catalog_markdown(catalog),
+            media_type="text/markdown; charset=utf-8",
+        )
         run.complete([catalog_json, drift_json, matrix])
     except BaseException as error:
         run.fail(error)
@@ -220,14 +343,19 @@ def _inventory(args: argparse.Namespace) -> int:
 def _review(args: argparse.Namespace) -> int:
     registry = load_registry(args.config_root)
     require_tracks(registry, args.track)
-    run = _start_run(args, registry, "review", {
-        "tracks": args.track,
-        "paths": args.path,
-        "changed_from": args.changed_from,
-        "scope": args.scope,
-        "rules": args.rule,
-        "fail_on_candidates": args.fail_on_candidates,
-    })
+    run = _start_run(
+        args,
+        registry,
+        "review",
+        {
+            "tracks": args.track,
+            "paths": args.path,
+            "changed_from": args.changed_from,
+            "scope": args.scope,
+            "rules": args.rule,
+            "fail_on_candidates": args.fail_on_candidates,
+        },
+    )
     try:
         ensure_asterinas_checkout(args.asterinas)
         catalog = InventoryBuilder(args.asterinas, registry).build()
@@ -246,16 +374,28 @@ def _review(args: argparse.Namespace) -> int:
             scope=args.scope,
             rule_ids=args.rule or None,
         )
-        findings = run.write_json("review/findings.json", result.to_dict())
-        report = run.write_text("review/report.md", review_markdown(result))
-        selection = run.write_json("review/selection.json", {
-            "tracks": args.track,
-            "changed_from": args.changed_from,
-            "scope": args.scope,
-            "rules": list(result.rules_run),
-            "files": list(result.files_selected),
-            "files_with_scanned_code": list(result.files_scanned),
-        })
+        findings = run.write_json(
+            "review/findings.json",
+            result.to_dict(),
+            schema="review-result.schema.json",
+        )
+        report = run.write_text(
+            "review/report.md",
+            review_markdown(result),
+            media_type="text/markdown; charset=utf-8",
+        )
+        selection = run.write_json(
+            "review/selection.json",
+            {
+                "tracks": args.track,
+                "changed_from": args.changed_from,
+                "scope": args.scope,
+                "rules": list(result.rules_run),
+                "files": list(result.files_selected),
+                "files_with_scanned_code": list(result.files_scanned),
+            },
+            schema="review-selection.schema.json",
+        )
         run.complete([findings, report, selection])
     except BaseException as error:
         run.fail(error)
@@ -280,17 +420,22 @@ def _review(args: argparse.Namespace) -> int:
 def _model(args: argparse.Namespace) -> int:
     registry = load_registry(args.config_root)
     track = require_tracks(registry, [args.track])[0]
-    run = _start_run(args, registry, "model", {
-        "track": args.track,
-        "stage": args.stage,
-        "specula_profile": str(args.specula_profile.resolve()),
-        "specula_repo": str(args.specula_repo.resolve()),
-        "export_linked": args.export_linked,
-        "requested_run_id": args.run_id,
-    })
+    run = _start_run(
+        args,
+        registry,
+        "model",
+        {
+            "track": args.track,
+            "stage": args.stage,
+            "specula_profile": str(args.specula_profile.resolve()),
+            "specula_repo": str(args.specula_repo.resolve()),
+            "export_linked": args.export_linked,
+            "requested_run_id": args.run_id,
+        },
+    )
     try:
         ensure_asterinas_checkout(args.asterinas)
-        handoff, command, extra = prepare_handoff(
+        plan = prepare_handoff(
             source_root=args.asterinas,
             profile_root=args.specula_profile,
             specula_repo=args.specula_repo,
@@ -300,12 +445,19 @@ def _model(args: argparse.Namespace) -> int:
             run_id=args.run_id,
             export_linked=args.export_linked,
         )
-        handoff_path = run.write_json("specula/handoff.json", handoff)
-        outputs = [handoff_path, *extra]
+        handoff = plan.evidence
+        handoff_path = run.write_json(
+            "specula/handoff.json",
+            handoff,
+            schema=plan.schema,
+        )
+        outputs = [handoff_path, *plan.artifacts]
+        command = plan.command_with_preflight(handoff_path)
         if command:
             command_path = run.write_text(
                 "specula/command.sh",
-                "#!/bin/sh\nset -eu\n\nexec " + command + "\n",
+                "#!/bin/sh\nset -eu\n\n" + command + "\n",
+                media_type="text/x-shellscript; charset=utf-8",
             )
             command_path.chmod(0o755)
             outputs.append(command_path)
@@ -329,15 +481,20 @@ def _model(args: argparse.Namespace) -> int:
 
 def _agent_review(args: argparse.Namespace) -> int:
     registry = load_registry(args.config_root)
-    run = _start_run(args, registry, "agent-review", {
-        "base": args.base,
-        "paths": args.path or [],
-        "agent_profile": args.agent_profile,
-        "per_persona_context": args.per_persona_context,
-    })
+    run = _start_run(
+        args,
+        registry,
+        "agent-review",
+        {
+            "base": args.base,
+            "paths": args.path or [],
+            "agent_profile": args.agent_profile,
+            "per_persona_context": args.per_persona_context,
+        },
+    )
     try:
         ensure_asterinas_checkout(args.asterinas)
-        handoff, command = prepare_aster_code_review(
+        plan = prepare_aster_code_review(
             source_root=args.asterinas,
             run_root=run.root,
             agent_profile=args.agent_profile,
@@ -345,10 +502,21 @@ def _agent_review(args: argparse.Namespace) -> int:
             base=args.base,
             paths=args.path or (),
         )
-        handoff_path = run.write_json("agent-review/handoff.json", handoff)
+        handoff = plan.evidence
+        handoff_path = run.write_json(
+            "agent-review/handoff.json",
+            handoff,
+            schema=plan.schema,
+        )
+        command = plan.command_with_preflight(handoff_path)
+        if command is None:
+            raise ValueError(
+                "agent-review handoff unexpectedly has no execution command"
+            )
         command_path = run.write_text(
             "agent-review/command.sh",
             "#!/bin/sh\nset -eu\n\n" + command + "\n",
+            media_type="text/x-shellscript; charset=utf-8",
         )
         command_path.chmod(0o755)
         run.complete([handoff_path, command_path])
@@ -382,8 +550,16 @@ def _report(args: argparse.Namespace) -> int:
     )
     try:
         summary = aggregate_runs(work_root, exclude_run=run.root)
-        output_json = run.write_json("report/summary.json", summary)
-        output_md = run.write_text("report/summary.md", aggregate_markdown(summary))
+        output_json = run.write_json(
+            "report/summary.json",
+            summary,
+            schema="report-summary.schema.json",
+        )
+        output_md = run.write_text(
+            "report/summary.md",
+            aggregate_markdown(summary),
+            media_type="text/markdown; charset=utf-8",
+        )
         run.complete([output_json, output_md])
     except BaseException as error:
         run.fail(error)
@@ -408,6 +584,16 @@ def _tracks(args: argparse.Namespace) -> int:
     else:
         for item in values:
             print(f"{item['id']}: {item['description']} [{item['specula_readiness']}]")
+    return 0
+
+
+def _verify_handoff(args: argparse.Namespace) -> int:
+    result = verify_handoff(args.handoff)
+    _print_result(
+        args.json,
+        result,
+        f"handoff preflight: verified {result['kind']}; handoff={result['handoff']}",
+    )
     return 0
 
 

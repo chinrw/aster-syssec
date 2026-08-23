@@ -5,9 +5,10 @@ import json
 import os
 import subprocess
 import tempfile
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -23,37 +24,57 @@ class SourceSnapshot:
         return asdict(self)
 
 
-def _git(root: Path, *args: str, check: bool = False) -> subprocess.CompletedProcess[bytes]:
+def _git(
+    root: Path, *args: str, check: bool = False
+) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
         ["git", "-C", str(root), *args],
         check=check,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         timeout=30,
     )
 
 
 def inspect_source(root: Path) -> SourceSnapshot:
     root = root.resolve()
-    revision_result = _git(root, "rev-parse", "HEAD")
-    revision = (
-        revision_result.stdout.decode("utf-8", "replace").strip()
-        if revision_result.returncode == 0
+    top_level = _git(root, "rev-parse", "--show-toplevel")
+    repository_root = (
+        Path(top_level.stdout.decode("utf-8", "replace").strip()).resolve()
+        if top_level.returncode == 0
         else None
     )
-    branch_result = _git(root, "branch", "--show-current")
-    branch = (
-        branch_result.stdout.decode("utf-8", "replace").strip() or None
-        if branch_result.returncode == 0
-        else None
-    )
-    status_result = _git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all")
-    status_bytes = status_result.stdout if status_result.returncode == 0 else b"not-a-git-repository"
-    entries = tuple(
-        entry.decode("utf-8", "surrogateescape")
-        for entry in status_bytes.split(b"\0")
-        if entry
-    )
+    is_repository_root = repository_root == root
+    if is_repository_root:
+        revision_result = _git(root, "rev-parse", "HEAD")
+        revision = (
+            revision_result.stdout.decode("utf-8", "replace").strip()
+            if revision_result.returncode == 0
+            else None
+        )
+        branch_result = _git(root, "branch", "--show-current")
+        branch = (
+            branch_result.stdout.decode("utf-8", "replace").strip() or None
+            if branch_result.returncode == 0
+            else None
+        )
+        status_result = _git(
+            root, "status", "--porcelain=v1", "-z", "--untracked-files=all"
+        )
+        status_bytes = (
+            status_result.stdout
+            if status_result.returncode == 0
+            else b"git-status-failed"
+        )
+        entries = tuple(
+            entry.decode("utf-8", "surrogateescape")
+            for entry in status_bytes.split(b"\0")
+            if entry
+        )
+    else:
+        revision = None
+        branch = None
+        status_bytes = b"not-a-git-repository"
+        entries = ()
 
     digest = hashlib.sha256()
     digest.update(status_bytes)
@@ -69,6 +90,8 @@ def inspect_source(root: Path) -> SourceSnapshot:
             if candidate.is_file():
                 digest.update(relative.encode("utf-8", "surrogateescape"))
                 digest.update(hashlib.sha256(candidate.read_bytes()).digest())
+    else:
+        _hash_source_tree(root, digest)
 
     git_marker = root / ".git"
     if git_marker.is_dir():
@@ -100,9 +123,20 @@ def ensure_asterinas_checkout(root: Path) -> None:
         raise ValueError(f"not a supported Asterinas checkout; missing: {joined}")
 
 
+def require_disjoint_paths(source_root: Path, work_root: Path) -> None:
+    source = Path(source_root).resolve()
+    work = Path(work_root).resolve()
+    if source == work or work.is_relative_to(source) or source.is_relative_to(work):
+        raise ValueError("Asterinas checkout and SYSSEC_WORK_ROOT must not overlap")
+
+
 def atomic_write_json(path: Path, value: Any) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    return atomic_write_text(path, payload)
+
+
+def atomic_write_text(path: Path, payload: str) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
@@ -130,3 +164,21 @@ def relative_paths(root: Path, paths: Iterable[Path]) -> tuple[str, ...]:
             raise ValueError(f"path is outside Asterinas checkout: {path}") from error
         result.append(relative.as_posix())
     return tuple(result)
+
+
+def _hash_source_tree(root: Path, digest: Any) -> None:
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            payload = os.readlink(path).encode("utf-8", "surrogateescape")
+            kind = b"symlink"
+        elif path.is_file():
+            payload = path.read_bytes()
+            kind = b"file"
+        else:
+            continue
+        digest.update(kind)
+        digest.update(b"\0")
+        digest.update(relative.encode("utf-8", "surrogateescape"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(payload).digest())

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/agent-review-handoff.schema.json",
+  "title": "Gated Asterinas code-review handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "ready",
+    "mode",
+    "base",
+    "base_revision",
+    "head_revision",
+    "paths",
+    "output",
+    "source",
+    "skill",
+    "skill_sha256",
+    "launcher",
+    "launcher_sha256",
+    "agent_profile",
+    "profile_files",
+    "per_persona_context",
+    "executes_agents",
+    "executed_by_syssec",
+    "execution_command",
+    "preflight"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "aster-code-review" },
+    "ready": { "const": true },
+    "mode": { "enum": ["diff", "files"] },
+    "base": { "type": ["string", "null"] },
+    "base_revision": { "type": ["string", "null"] },
+    "head_revision": { "type": ["string", "null"] },
+    "paths": { "type": "array", "items": { "type": "string" } },
+    "output": { "type": "string" },
+    "source": { "$ref": "#/$defs/source" },
+    "skill": { "type": "string" },
+    "skill_sha256": { "$ref": "#/$defs/sha256" },
+    "launcher": { "type": "string" },
+    "launcher_sha256": { "$ref": "#/$defs/sha256" },
+    "agent_profile": { "type": "string" },
+    "profile_files": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/sha256" }
+    },
+    "per_persona_context": { "enum": ["auto", "yes", "no"] },
+    "executes_agents": { "const": true },
+    "executed_by_syssec": { "const": false },
+    "execution_command": { "type": "string" },
+    "preflight": { "$ref": "#/$defs/preflight" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "required": ["path", "revision", "dirty_hash", "dirty_entries", "git_dir_kind"],
+      "properties": {
+        "path": { "type": "string" },
+        "revision": { "type": ["string", "null"] },
+        "dirty_hash": { "$ref": "#/$defs/sha256" },
+        "dirty_entries": { "type": "array", "items": { "type": "string" } },
+        "git_dir_kind": { "enum": ["directory", "file", "absent"] }
+      }
+    },
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer", "checkouts", "files"],
+      "properties": {
+        "reviewer": { "type": "object" },
+        "checkouts": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/source" }
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    }
+  }
+}

@@ -12,7 +12,51 @@ from tests.helpers import write_fixture, write_specula_inputs
 
 
 class CliTests(unittest.TestCase):
-    def test_inventory_writes_evidence_and_check_fails_only_after_completion(self) -> None:
+    def test_rejects_work_root_inside_source_before_creating_run(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = write_fixture(Path(tmp) / "source")
+            work = source / ".syssec"
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                status = main(
+                    [
+                        "inventory",
+                        "--asterinas",
+                        str(source),
+                        "--work-root",
+                        str(work),
+                    ]
+                )
+
+            self.assertEqual(status, 2)
+            self.assertFalse(work.exists())
+            self.assertIn("must not overlap", stderr.getvalue())
+
+    def test_rejects_work_root_that_contains_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp) / "work"
+            source = write_fixture(work / "source")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                status = main(
+                    [
+                        "review",
+                        "--asterinas",
+                        str(source),
+                        "--work-root",
+                        str(work),
+                        "--path",
+                        "kernel/core/src/syscall/read.rs",
+                    ]
+                )
+
+            self.assertEqual(status, 2)
+            self.assertFalse((work / "runs").exists())
+            self.assertIn("must not overlap", stderr.getvalue())
+
+    def test_inventory_writes_evidence_and_check_fails_only_after_completion(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             source = write_fixture(base / "source")
@@ -31,11 +75,16 @@ class CliTests(unittest.TestCase):
                 )
             manifest_path = next(work.rglob("run-manifest.json"))
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            matrix_exists = (manifest_path.parent / "catalog/syscall-matrix.md").is_file()
+            matrix_exists = (
+                manifest_path.parent / "catalog/syscall-matrix.md"
+            ).is_file()
 
         self.assertEqual(status, 1)
         self.assertEqual(manifest["status"], "completed")
-        self.assertIn("catalog/syscalls.json", manifest["outputs"])
+        self.assertIn(
+            "catalog/syscalls.json", [item["path"] for item in manifest["outputs"]]
+        )
+        self.assertTrue(all(len(item["sha256"]) == 64 for item in manifest["outputs"]))
         self.assertTrue(matrix_exists)
 
     def test_review_never_reports_confirmed_findings(self) -> None:
@@ -64,7 +113,9 @@ class CliTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(summary["confirmed_findings"], 0)
         self.assertGreater(summary["candidates"], 0)
-        self.assertTrue(all(item["status"] == "candidate" for item in findings["candidates"]))
+        self.assertTrue(
+            all(item["status"] == "candidate" for item in findings["candidates"])
+        )
 
     def test_model_blocks_linked_worktree_without_explicit_export(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -90,7 +141,9 @@ class CliTests(unittest.TestCase):
                         "--json",
                     ]
                 )
-            handoff = json.loads(next(work.rglob("handoff.json")).read_text(encoding="utf-8"))
+            handoff = json.loads(
+                next(work.rglob("handoff.json")).read_text(encoding="utf-8")
+            )
 
         self.assertEqual(status, 1)
         self.assertFalse(handoff["ready"])
@@ -115,7 +168,9 @@ class CliTests(unittest.TestCase):
                         "--json",
                     ]
                 )
-            handoff = json.loads(next(work.rglob("handoff.json")).read_text(encoding="utf-8"))
+            handoff = json.loads(
+                next(work.rglob("handoff.json")).read_text(encoding="utf-8")
+            )
             command = next(work.rglob("command.sh")).read_text(encoding="utf-8")
 
         self.assertEqual(status, 0)

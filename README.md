@@ -5,16 +5,19 @@ It reads an Asterinas checkout without modifying it and provides one CLI seam
 for inventory, deterministic candidate review, Asterinas's own agent reviewer,
 and gated Specula preparation.
 
-The first version implements:
+Version 0.2 implements:
 
 - three-architecture syscall dispatch inventory;
 - handler signature, SCML, regression-source, and track reconciliation;
+- one Track router shared by inventory, source selection, and candidate review;
 - structural drift checks and baseline comparisons;
 - eight syscall security tracks and twelve numbered properties;
 - nine static candidate rules over syscall handlers and same-file callees;
-- immutable run manifests and JSON/Markdown evidence;
+- atomically updated run manifests with schema-validated, hashed artifacts;
 - read-only adapters for Asterinas `aster-code-review` and Specula;
-- exact-HEAD export for linked worktrees.
+- preflight-checked handoffs with exact source identities;
+- history-preserving exact-HEAD export for linked worktrees;
+- pinned GitHub Actions validation against the locked Asterinas source.
 
 It does not implement Kani, Miri, cargo-fuzz, Loom, differential VM execution,
 fault injection, or kernel fuzzing. `doctor` reports those engines as
@@ -23,8 +26,8 @@ intended verification matrix, not a completed run.
 
 ## Install
 
-Python 3.11 or newer is sufficient. Runtime dependencies are from the standard
-library.
+Python 3.11 or newer is sufficient. Installing the project supplies its
+`jsonschema` and `referencing` runtime dependencies.
 
 The preferred development path is the locked Nix flake:
 
@@ -83,6 +86,10 @@ syssec doctor \
   --asterinas "$ASTERINAS_REPO" \
   --work-root "$SYSSEC_WORK_ROOT"
 
+syssec config-check \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT"
+
 syssec inventory \
   --asterinas "$ASTERINAS_REPO" \
   --work-root "$SYSSEC_WORK_ROOT" \
@@ -94,8 +101,10 @@ syssec review \
   --track socket-cmsg-iovec
 ```
 
-Every evidence-producing command creates `run-manifest.json` before other
-outputs. A run is stored under:
+The checkout and work root must not contain each other. Every
+evidence-producing command creates `run-manifest.json` before other outputs,
+then atomically transitions it to `completed` or `failed`. A run is stored
+under:
 
 ```text
 <work-root>/runs/<revision>/<run-id>/
@@ -105,6 +114,12 @@ outputs. A run is stored under:
 ├── agent-review/
 └── specula/
 ```
+
+Completed manifest output entries record the artifact path, SHA-256, size,
+media type, schema identity, schema hash, and integrity status. The manifest
+also records the reviewer Git/content identity, rule hash, schema-set hash, and
+`flake.lock` hash. `report` verifies these records before reading artifacts and
+counts repeated candidate IDs once while retaining an occurrence count.
 
 ## Inventory
 
@@ -116,6 +131,11 @@ outputs. A run is stored under:
 - SCML call declarations;
 - identifier references in Asterinas regression sources;
 - bundled track and property configuration.
+
+Handler effects are derived from each function body and its same-file direct
+callees. Operations elsewhere in the same Rust file are not attributed to the
+handler. `TrackRouter` is the single owner of syscall, source-path, and
+candidate Track precedence.
 
 Outputs:
 
@@ -208,9 +228,10 @@ syssec agent-review \
   --per-persona-context=yes
 ```
 
-The run contains `agent-review/handoff.json` and `command.sh`. Execute the
-script only after reviewing its pinned source, profile, target, and output
-path. Diff mode uses `--base <ref>` instead of `--path`.
+The run contains `agent-review/handoff.json` and `command.sh`. Diff mode
+resolves `--base <ref>` to an immutable merge-base commit. The script runs
+`syssec verify-handoff` before the reviewer and refuses changed source, skill,
+launcher, profile, or target inputs.
 
 ## Specula handoff
 
@@ -230,9 +251,11 @@ syssec model \
 ```
 
 `--export-linked` is required when `.git` is a linked-worktree file. It creates
-a tracked-file-only `git archive` of exact HEAD under the run directory. It
-refuses the export when tracked working-tree changes would be omitted. Untracked
-files are recorded as excluded inputs.
+an independent checkout from a Git bundle containing exact HEAD and its
+ancestors. The export has its own `.git` directory, no object alternates, a
+clean detached HEAD, and enough history for local archaeology. It refuses the
+export when tracked working-tree changes would be omitted. Untracked files are
+recorded as excluded inputs.
 
 After analysis, inspect `modeling-brief.md`, `analysis-report.md`, and
 `review-analysis.md`. Spec generation remains blocked until a human accepts one
@@ -240,6 +263,12 @@ shared state machine and one Linux-visible contract.
 
 The files under the supplied `--specula-profile` path are read in place. The
 prepared agent config and guidance are not edited or copied back.
+
+Both handoff scripts verify the reviewer, checkout revisions and dirty hashes,
+and hashed input files before execution. `verify-handoff` is read-only and does
+not start either external tool. The script pins this check to the reviewer
+source or installed entry point used during preparation; it does not resolve a
+possibly different `syssec` from PATH.
 
 ## Exit status
 
@@ -261,4 +290,6 @@ unexpected exception leaves the manifest marked `failed`.
 - [Catalog schema](schemas/syscall-catalog.schema.json)
 - [Finding schema](schemas/finding.schema.json)
 - [Run manifest schema](schemas/run-manifest.schema.json)
+- [Specula handoff schema](schemas/specula-handoff.schema.json)
+- [Asterinas review handoff schema](schemas/agent-review-handoff.schema.json)
 - [Trace event schema](schemas/trace-event.schema.json)

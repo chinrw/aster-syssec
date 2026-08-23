@@ -3,39 +3,97 @@
   "$id": "https://asterinas.dev/syssec/syscall-catalog.schema.json",
   "title": "Asterinas syscall catalog",
   "type": "object",
+  "additionalProperties": false,
   "required": ["schema_version", "source", "syscalls", "drift"],
   "properties": {
     "schema_version": { "const": 1 },
-    "source": {
-      "type": "object",
-      "required": ["path", "revision", "dirty_hash"],
-      "properties": {
-        "path": { "type": "string" },
-        "revision": { "type": ["string", "null"] },
-        "dirty_hash": { "type": "string" }
-      }
-    },
+    "source": { "$ref": "#/$defs/source" },
     "syscalls": { "type": "array", "items": { "$ref": "#/$defs/syscall" } },
     "drift": { "type": "array", "items": { "$ref": "#/$defs/drift" } }
   },
   "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "revision", "branch", "dirty_hash", "dirty_entries", "git_dir_kind"],
+      "properties": {
+        "path": { "type": "string" },
+        "revision": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "dirty_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "dirty_entries": { "type": "array", "items": { "type": "string" } },
+        "git_dir_kind": { "enum": ["directory", "file", "absent"] }
+      }
+    },
+    "dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["number", "arity", "constant", "path", "line"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 0 },
+        "arity": { "type": "integer", "minimum": 0 },
+        "constant": { "type": "string" },
+        "path": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "files", "reference_count"],
+      "properties": {
+        "status": { "enum": ["described", "referenced", "missing"] },
+        "files": { "type": "array", "items": { "type": "string" } },
+        "reference_count": { "type": "integer", "minimum": 0 }
+      }
+    },
     "syscall": {
       "type": "object",
-      "required": ["name", "handler", "architectures", "scml", "regression", "security_tracks"],
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "handler",
+        "architectures",
+        "handler_path",
+        "handler_line",
+        "raw_abi_argument_count",
+        "converted_rust_types",
+        "user_pointers",
+        "copy_in_operations",
+        "copy_out_operations",
+        "kernel_objects_reached",
+        "permission_checks",
+        "locks_and_waits",
+        "scml",
+        "regression",
+        "security_tracks"
+      ],
       "properties": {
         "name": { "type": "string" },
         "handler": { "type": "string" },
+        "architectures": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/dispatch" }
+        },
         "handler_path": { "type": ["string", "null"] },
         "handler_line": { "type": ["integer", "null"], "minimum": 1 },
-        "architectures": { "type": "object" },
-        "scml": { "type": "object" },
-        "regression": { "type": "object" },
+        "raw_abi_argument_count": { "type": "integer", "minimum": 0 },
+        "converted_rust_types": { "type": "array", "items": { "type": "string" } },
+        "user_pointers": { "type": "array", "items": { "type": "string" } },
+        "copy_in_operations": { "type": "array", "items": { "type": "string" } },
+        "copy_out_operations": { "type": "array", "items": { "type": "string" } },
+        "kernel_objects_reached": { "type": "array", "items": { "type": "string" } },
+        "permission_checks": { "type": "array", "items": { "type": "string" } },
+        "locks_and_waits": { "type": "array", "items": { "type": "string" } },
+        "scml": { "$ref": "#/$defs/coverage" },
+        "regression": { "$ref": "#/$defs/coverage" },
         "security_tracks": { "type": "array", "items": { "type": "string" } }
       }
     },
     "drift": {
       "type": "object",
-      "required": ["kind", "severity", "message"],
+      "additionalProperties": false,
+      "required": ["kind", "severity", "message", "syscall", "path"],
       "properties": {
         "kind": { "type": "string" },
         "severity": { "enum": ["error", "warning", "info"] },

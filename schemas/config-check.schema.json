@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/config-check.schema.json",
+  "title": "Track configuration validation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "issues"],
+  "properties": {
+    "status": { "enum": ["ok", "warn", "fail"] },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "detail"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "enum": ["PASS", "WARN", "FAIL"] },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

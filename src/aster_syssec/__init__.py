@@ -1,6 +1,6 @@
 """Evidence-first Asterinas syscall security reviewer."""
 
-from .models import Catalog, Candidate, ReviewResult
+from .models import Candidate, Catalog, ReviewResult
 
-__all__ = ["Catalog", "Candidate", "ReviewResult"]
-__version__ = "0.1.0"
+__all__ = ["Candidate", "Catalog", "ReviewResult"]
+__version__ = "0.2.0"

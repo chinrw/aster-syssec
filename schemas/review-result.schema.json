@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/review-result.schema.json",
+  "title": "Static syscall review result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source",
+    "files_selected",
+    "files_scanned",
+    "functions_scanned",
+    "rules_run",
+    "limitations",
+    "candidates"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "source": { "type": "object" },
+    "files_selected": { "type": "array", "items": { "type": "string" } },
+    "files_scanned": { "type": "array", "items": { "type": "string" } },
+    "functions_scanned": { "type": "integer", "minimum": 0 },
+    "rules_run": { "type": "array", "items": { "type": "string" } },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "candidates": {
+      "type": "array",
+      "items": { "$ref": "https://asterinas.dev/syssec/finding.schema.json" }
+    }
+  }
+}

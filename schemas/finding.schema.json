@@ -3,36 +3,63 @@
   "$id": "https://asterinas.dev/syssec/finding.schema.json",
   "title": "Asterinas syscall security candidate or finding",
   "type": "object",
+  "additionalProperties": false,
   "required": [
-    "schema_version", "finding_id", "status", "engine", "track",
-    "source_commit", "source_anchor", "violated_property", "evidence",
-    "security_impact", "confidence"
+    "schema_version",
+    "finding_id",
+    "rule_id",
+    "title",
+    "status",
+    "engine",
+    "track",
+    "source_commit",
+    "source_anchor",
+    "violated_property",
+    "evidence",
+    "rationale",
+    "expected_result",
+    "observed_result",
+    "reproducer_path",
+    "linux_comparison",
+    "scml_support_status",
+    "security_impact",
+    "confidence",
+    "raw_artifact_paths"
   ],
   "properties": {
     "schema_version": { "const": 1 },
-    "finding_id": { "type": "string" },
+    "finding_id": { "type": "string", "minLength": 1 },
+    "rule_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
     "status": {
       "enum": [
-        "candidate", "refuted", "unsupported-by-scml", "compatibility-only",
-        "reproduced", "confirmed-correctness", "confirmed-security", "fixed",
+        "candidate",
+        "refuted",
+        "unsupported-by-scml",
+        "compatibility-only",
+        "reproduced",
+        "confirmed-correctness",
+        "confirmed-security",
+        "fixed",
         "regression-promoted"
       ]
     },
-    "engine": { "type": "string" },
-    "rule_id": { "type": "string" },
-    "track": { "type": "string" },
+    "engine": { "type": "string", "minLength": 1 },
+    "track": { "type": "string", "minLength": 1 },
     "source_commit": { "type": ["string", "null"] },
     "source_anchor": {
       "type": "object",
-      "required": ["path", "line"],
+      "additionalProperties": false,
+      "required": ["path", "line", "symbol"],
       "properties": {
-        "path": { "type": "string" },
+        "path": { "type": "string", "minLength": 1 },
         "line": { "type": "integer", "minimum": 1 },
         "symbol": { "type": ["string", "null"] }
       }
     },
-    "violated_property": { "type": "string" },
-    "evidence": { "type": "string" },
+    "violated_property": { "type": "string", "minLength": 1 },
+    "evidence": { "type": "string", "minLength": 1 },
+    "rationale": { "type": "string", "minLength": 1 },
     "expected_result": { "type": ["string", "null"] },
     "observed_result": { "type": ["string", "null"] },
     "reproducer_path": { "type": ["string", "null"] },
@@ -40,6 +67,9 @@
     "scml_support_status": { "type": ["string", "null"] },
     "security_impact": { "type": ["string", "null"] },
     "confidence": { "enum": ["low", "medium", "high"] },
-    "raw_artifact_paths": { "type": "array", "items": { "type": "string" } }
+    "raw_artifact_paths": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
   }
 }

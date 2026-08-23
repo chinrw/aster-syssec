@@ -1,7 +1,7 @@
 version = 1
 
 [profiles.pr]
-implemented_commands = ["inventory --check", "review --changed-from"]
+implemented_commands = ["config-check", "inventory --check", "review --changed-from"]
 blocking = [
   "structural catalog drift",
   "baseline dispatch or coverage regression",

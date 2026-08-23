@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+      - name: Validate flake and package
+        run: nix flake check --print-build-logs
+
+      - name: Validate pinned Asterinas inventory and Track configuration
+        env:
+          SYSSEC_WORK_ROOT: ${{ runner.temp }}/aster-syssec
+        run: nix develop .#default --command ./scripts/ci-integration.sh
+
+      - name: Upload evidence bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aster-syssec-evidence
+          path: ${{ runner.temp }}/aster-syssec
+          if-no-files-found: warn
+          retention-days: 14

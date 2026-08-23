@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/review-selection.schema.json",
+  "title": "Static review source selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tracks",
+    "changed_from",
+    "scope",
+    "rules",
+    "files",
+    "files_with_scanned_code"
+  ],
+  "properties": {
+    "tracks": { "type": "array", "items": { "type": "string" } },
+    "changed_from": { "type": ["string", "null"] },
+    "scope": { "enum": ["handlers", "selected"] },
+    "rules": { "type": "array", "items": { "type": "string" } },
+    "files": { "type": "array", "items": { "type": "string" } },
+    "files_with_scanned_code": { "type": "array", "items": { "type": "string" } }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/report-summary.schema.json",
+  "title": "Cross-run evidence summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "runs",
+    "by_status",
+    "candidates",
+    "candidate_occurrences",
+    "structural_errors",
+    "run_ids",
+    "invalid_runs"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "runs": { "type": "integer", "minimum": 0 },
+    "by_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["running", "completed", "failed"],
+      "properties": {
+        "running": { "type": "integer", "minimum": 0 },
+        "completed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "candidates": { "type": "integer", "minimum": 0 },
+    "candidate_occurrences": { "type": "integer", "minimum": 0 },
+    "structural_errors": { "type": "integer", "minimum": 0 },
+    "run_ids": {
+      "type": "array",
+      "items": { "type": ["string", "null"] }
+    },
+    "invalid_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["manifest", "error"],
+        "properties": {
+          "manifest": { "type": "string" },
+          "error": { "type": "string" }
+        }
+      }
+    }
+  }
+}

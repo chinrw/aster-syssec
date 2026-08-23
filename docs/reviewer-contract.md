@@ -3,11 +3,17 @@
 ## Trust boundary
 
 The Asterinas checkout is input. Inventory and review commands do not edit it.
-Evidence is written only below the selected work root.
+Evidence is written only below the selected work root. The checkout and work
+root must be disjoint in both directions after resolving symlinks.
 
 The Specula profile and Asterinas `aster-code-review` skill are also inputs.
 Their hashes are recorded before a handoff. `aster-syssec` does not rewrite
 their configuration or guidance.
+
+Every JSON artifact is validated against its declared schema before it is
+registered. Completion revalidates the artifact, records its hash and size,
+and fails if the source or an artifact changed during the run. `report` verifies
+the same records before consuming evidence.
 
 ## Result classes
 
@@ -56,5 +62,10 @@ Structural parse errors fail closed. Coverage gaps remain visible warnings
 unless `--strict-coverage` or baseline regression policy selects them as
 blocking.
 
-Specula preparation refuses tracked-dirty linked-worktree exports. Agent and
-Specula adapters generate scripts but do not execute them.
+Specula preparation refuses tracked-dirty linked-worktree exports. The export
+is an independent Git checkout containing exact HEAD history and no object
+alternates. Agent and Specula adapters generate scripts but do not execute
+them. The preflight invocation is pinned to the reviewer source or installed
+entry point that prepared the handoff, not a later PATH lookup. Generated
+scripts fail closed unless their recorded source, reviewer, configuration,
+guidance, launcher, profile, and target identities still match.

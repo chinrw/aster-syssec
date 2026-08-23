@@ -28,11 +28,15 @@ nix develop
 Provides:
 
 - packaged `syssec` and source-tree `syssec-dev`;
-- Python, uv, Git, jq, ripgrep, GNU Make;
+- Python with the locked schema-validation dependencies, uv, Git, jq, ripgrep,
+  GNU Make;
 - Pyright, Ruff, ShellCheck, nixfmt, and JSON Schema validation.
 
 `syssec` is the immutable Nix package. `syssec-dev` loads
 `$SYSSEC_SOURCE_ROOT/src`, defaulting to the current directory.
+
+The shell exports `ASTERINAS_PINNED_SOURCE` for integration checks against the
+exact Asterinas input in `flake.lock`.
 
 ### `formal`
 

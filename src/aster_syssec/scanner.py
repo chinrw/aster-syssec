@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from .config import Registry
 from .models import Candidate, Catalog, ReviewResult
+from .routing import TrackRouter
+from .rust_source import RustFunction, RustSourceIndex
 from .source import inspect_source, relative_paths
-
 
 RULE_IDS = (
     "RAW-DISPATCH-INFERRED-CAST",
@@ -22,15 +23,6 @@ RULE_IDS = (
     "LOCK-GUARD-ACROSS-BLOCKING",
     "TYPED-STRUCT-COPYOUT",
 )
-
-
-@dataclass(frozen=True)
-class _Function:
-    symbol: str
-    start: int
-    end: int
-    start_line: int
-    parameter_names: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -51,15 +43,10 @@ class StaticReviewer:
         self.source_root = Path(source_root).resolve()
         self.registry = registry
         self.catalog = catalog
+        self.router = TrackRouter(registry, catalog)
         self._handler_entries: dict[str, list] = {}
-        self._path_tracks: dict[str, list[str]] = {}
         for syscall in catalog.syscalls:
             self._handler_entries.setdefault(syscall.handler, []).append(syscall)
-            if syscall.handler_path:
-                tracks = self._path_tracks.setdefault(syscall.handler_path, [])
-                for track in syscall.security_tracks:
-                    if track not in tracks:
-                        tracks.append(track)
 
     def review(
         self,
@@ -84,8 +71,17 @@ class StaticReviewer:
             if path.suffix != ".rs" or not path.is_file():
                 continue
             text = path.read_text(encoding="utf-8")
-            masked = mask_non_code(text)
-            functions = _extract_functions(masked, handlers_only=scope == "handlers")
+            index = RustSourceIndex(text)
+            masked = index.masked
+            functions = (
+                index.reachable_from(
+                    function.symbol
+                    for function in index.functions
+                    if function.symbol.startswith("sys_")
+                )
+                if scope == "handlers"
+                else index.functions
+            )
             raw_candidates = _scan_file_level(text, masked, relative_path)
             raw_candidates.extend(_scan_file(text, masked, functions))
             if scope == "selected" or functions or raw_candidates:
@@ -94,7 +90,12 @@ class StaticReviewer:
             for raw in raw_candidates:
                 if raw.rule_id not in selected_rules:
                     continue
-                track = self._route(raw, relative_path)
+                track = self.router.candidate_route(
+                    rule_id=raw.rule_id,
+                    preferred_track=raw.preferred_track,
+                    symbol=raw.symbol,
+                    path=relative_path,
+                ).primary
                 candidate_id = _candidate_id(
                     snapshot.revision,
                     raw.rule_id,
@@ -140,7 +141,9 @@ class StaticReviewer:
             files_scanned=tuple(sorted(set(scanned_files))),
             functions_scanned=function_count,
             candidates=ordered,
-            rules_run=tuple(rule_id for rule_id in RULE_IDS if rule_id in selected_rules),
+            rules_run=tuple(
+                rule_id for rule_id in RULE_IDS if rule_id in selected_rules
+            ),
             limitations=(
                 (
                     "Handler scope follows syscall handlers and same-file function calls only; method and cross-file reachability require selected scope, manual review, or a MIR backend."
@@ -152,40 +155,12 @@ class StaticReviewer:
             ),
         )
 
-    def _route(self, raw: _RawCandidate, path: str) -> str:
-        contextual_tracks = list(self._symbol_tracks(raw.symbol))
-        contextual_tracks.extend(
-            track for track in self._path_tracks.get(path, ()) if track not in contextual_tracks
-        )
-        contextual_tracks.extend(
-            track for track in self.registry.tracks_for_path(path) if track not in contextual_tracks
-        )
-        if raw.preferred_track in self.registry.tracks:
-            if raw.preferred_track in {"abi-integer-layout", "user-memory-partial-io"}:
-                if "socket-cmsg-iovec" in contextual_tracks and raw.rule_id in {
-                    "DOUBLE-FETCH-USER-METADATA",
-                    "COPYOUT-AFTER-SIDE-EFFECT",
-                    "TYPED-STRUCT-COPYOUT",
-                }:
-                    return "socket-cmsg-iovec"
-            return raw.preferred_track
-        non_abi = [track for track in contextual_tracks if track != "abi-integer-layout"]
-        return non_abi[0] if non_abi else "abi-integer-layout"
-
-    def _symbol_tracks(self, symbol: str | None) -> tuple[str, ...]:
-        if symbol is None:
-            return ()
-        tracks: list[str] = []
-        for entry in self._handler_entries.get(symbol, []):
-            for track in entry.security_tracks:
-                if track not in tracks:
-                    tracks.append(track)
-        return tuple(tracks)
-
     def _scml_status(self, symbol: str | None) -> str | None:
         if symbol is None:
             return None
-        statuses = {entry.scml.status for entry in self._handler_entries.get(symbol, [])}
+        statuses = {
+            entry.scml.status for entry in self._handler_entries.get(symbol, [])
+        }
         if "described" in statuses:
             return "described"
         if statuses:
@@ -193,11 +168,13 @@ class StaticReviewer:
         return None
 
 
-def _scan_file(text: str, masked: str, functions: tuple[_Function, ...]) -> list[_RawCandidate]:
+def _scan_file(
+    text: str, masked: str, functions: tuple[RustFunction, ...]
+) -> list[_RawCandidate]:
     result: list[_RawCandidate] = []
     for function in functions:
-        code = masked[function.start:function.end]
-        original = text[function.start:function.end]
+        code = masked[function.start : function.end]
+        original = text[function.start : function.end]
         result.extend(_scan_line_rules(original, code, function))
         result.extend(_scan_double_fetch(original, code, function))
         result.extend(_scan_copyout_after_effect(original, code, function))
@@ -230,14 +207,18 @@ def _scan_file_level(text: str, masked: str, path: str) -> list[_RawCandidate]:
     ]
 
 
-def _scan_line_rules(original: str, code: str, function: _Function) -> list[_RawCandidate]:
+def _scan_line_rules(
+    original: str, code: str, function: RustFunction
+) -> list[_RawCandidate]:
     result: list[_RawCandidate] = []
     original_lines = original.splitlines()
     code_lines = code.splitlines()
     parameters = set(function.parameter_names)
     for offset, code_line in enumerate(code_lines):
         line = function.start_line + offset
-        evidence = original_lines[offset].strip() if offset < len(original_lines) else ""
+        evidence = (
+            original_lines[offset].strip() if offset < len(original_lines) else ""
+        )
         if re.search(r"::from_bits_truncate\s*\(", code_line):
             result.append(
                 _RawCandidate(
@@ -252,7 +233,9 @@ def _scan_line_rules(original: str, code: str, function: _Function) -> list[_Raw
                     preferred_track="abi-integer-layout",
                 )
             )
-        if re.search(r"\b(?:unwrap|expect)\s*\(|\b(?:panic|todo|unimplemented)!\s*\(", code_line):
+        if re.search(
+            r"\b(?:unwrap|expect)\s*\(|\b(?:panic|todo|unimplemented)!\s*\(", code_line
+        ):
             result.append(
                 _RawCandidate(
                     rule_id="REACHABLE-PANIC",
@@ -285,11 +268,21 @@ def _scan_line_rules(original: str, code: str, function: _Function) -> list[_Raw
                     preferred_track="abi-integer-layout",
                 )
             )
-        if "checked_" not in code_line and "saturating_" not in code_line and "wrapping_" not in code_line:
+        if (
+            "checked_" not in code_line
+            and "saturating_" not in code_line
+            and "wrapping_" not in code_line
+        ):
             for parameter in parameters:
-                if not any(token in parameter.lower() for token in ("addr", "len", "count", "size", "offset")):
+                if not any(
+                    token in parameter.lower()
+                    for token in ("addr", "len", "count", "size", "offset")
+                ):
                     continue
-                if re.search(rf"\b{re.escape(parameter)}\b\s*[+*]|[+*]\s*\b{re.escape(parameter)}\b", code_line):
+                if re.search(
+                    rf"\b{re.escape(parameter)}\b\s*[+*]|[+*]\s*\b{re.escape(parameter)}\b",
+                    code_line,
+                ):
                     result.append(
                         _RawCandidate(
                             rule_id="UNCHECKED-RANGE-ARITHMETIC",
@@ -307,8 +300,12 @@ def _scan_line_rules(original: str, code: str, function: _Function) -> list[_Raw
     return result
 
 
-def _scan_double_fetch(original: str, code: str, function: _Function) -> list[_RawCandidate]:
-    pattern = re.compile(r"\b(?:read_val|read_slice|read_bytes)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)")
+def _scan_double_fetch(
+    original: str, code: str, function: RustFunction
+) -> list[_RawCandidate]:
+    pattern = re.compile(
+        r"\b(?:read_val|read_slice|read_bytes)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)"
+    )
     seen: dict[str, int] = {}
     for match in pattern.finditer(code):
         argument = match.group(1)
@@ -331,7 +328,9 @@ def _scan_double_fetch(original: str, code: str, function: _Function) -> list[_R
     return []
 
 
-def _scan_copyout_after_effect(original: str, code: str, function: _Function) -> list[_RawCandidate]:
+def _scan_copyout_after_effect(
+    original: str, code: str, function: RustFunction
+) -> list[_RawCandidate]:
     effect = re.compile(
         r"(?:\.(?:recvmsg|sendmsg|sendmmsg|recvfrom|accept|truncate|remove|insert|install|consume|dequeue|pop_front)\s*\("
         r"|\b(?:add_file|insert_entry|remove_entry|install_fd|consume_message|send_one_message)\s*\()"
@@ -364,15 +363,19 @@ def _scan_copyout_after_effect(original: str, code: str, function: _Function) ->
     ]
 
 
-def _scan_guard_across_blocking(original: str, code: str, function: _Function) -> list[_RawCandidate]:
+def _scan_guard_across_blocking(
+    original: str, code: str, function: RustFunction
+) -> list[_RawCandidate]:
     guard_pattern = re.compile(
         r"\blet\s+(?:mut\s+)?([A-Za-z_][A-Za-z0-9_]*(?:guard|table|lock)[A-Za-z0-9_]*)\s*=.*"
         r"(?:\.lock\s*\(|borrow_[A-Za-z0-9_]*\s*\()"
     )
-    blocking_pattern = re.compile(r"\.(?:wait|poll|recvmsg|sendmsg|accept|allocate)\s*\(")
+    blocking_pattern = re.compile(
+        r"\.(?:wait|poll|recvmsg|sendmsg|accept|allocate)\s*\("
+    )
     for guard in guard_pattern.finditer(code):
         name = guard.group(1)
-        drop = re.search(rf"\bdrop\s*\(\s*{re.escape(name)}\s*\)", code[guard.end():])
+        drop = re.search(rf"\bdrop\s*\(\s*{re.escape(name)}\s*\)", code[guard.end() :])
         region_end = guard.end() + drop.start() if drop else len(code)
         blocking = blocking_pattern.search(code, guard.end(), region_end)
         if blocking is None:
@@ -394,7 +397,9 @@ def _scan_guard_across_blocking(original: str, code: str, function: _Function) -
     return []
 
 
-def _scan_typed_copyout(original: str, code: str, function: _Function) -> list[_RawCandidate]:
+def _scan_typed_copyout(
+    original: str, code: str, function: RustFunction
+) -> list[_RawCandidate]:
     declarations = {
         match.group(1): match.group(2)
         for match in re.finditer(
@@ -437,153 +442,6 @@ def _scan_typed_copyout(original: str, code: str, function: _Function) -> list[_
     return []
 
 
-def _extract_functions(masked: str, *, handlers_only: bool) -> tuple[_Function, ...]:
-    result: list[_Function] = []
-    pattern = re.compile(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
-    for match in pattern.finditer(masked):
-        open_paren = masked.find("(", match.start())
-        close_paren = _matching_delimiter(masked, open_paren, "(", ")")
-        if close_paren is None:
-            continue
-        open_brace = masked.find("{", close_paren)
-        if open_brace < 0:
-            continue
-        close_brace = _matching_delimiter(masked, open_brace, "{", "}")
-        if close_brace is None:
-            continue
-        parameter_text = masked[open_paren + 1:close_paren]
-        parameter_names = tuple(
-            name
-            for name in re.findall(r"(?:^|,)\s*(?:mut\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*:", parameter_text)
-        )
-        start_line = masked.count("\n", 0, match.start()) + 1
-        result.append(
-            _Function(
-                symbol=match.group(1),
-                start=match.start(),
-                end=close_brace + 1,
-                start_line=start_line,
-                parameter_names=parameter_names,
-            )
-        )
-    if not handlers_only:
-        return tuple(result)
-    by_symbol = {function.symbol: function for function in result}
-    reachable = {function.symbol for function in result if function.symbol.startswith("sys_")}
-    pending = list(reachable)
-    while pending:
-        symbol = pending.pop()
-        function = by_symbol[symbol]
-        body = masked[function.start:function.end]
-        for callee in re.findall(r"\b([a-z_][A-Za-z0-9_]*)\s*\(", body):
-            if callee in by_symbol and callee not in reachable:
-                reachable.add(callee)
-                pending.append(callee)
-    return tuple(function for function in result if function.symbol in reachable)
-
-
-def _matching_delimiter(text: str, start: int, opening: str, closing: str) -> int | None:
-    depth = 0
-    for index in range(start, len(text)):
-        char = text[index]
-        if char == opening:
-            depth += 1
-        elif char == closing:
-            depth -= 1
-            if depth == 0:
-                return index
-    return None
-
-
-def mask_non_code(text: str) -> str:
-    result = list(text)
-    index = 0
-    block_depth = 0
-    state = "code"
-    raw_hashes = 0
-    while index < len(text):
-        if state == "line-comment":
-            if text[index] == "\n":
-                state = "code"
-            else:
-                result[index] = " "
-            index += 1
-            continue
-        if state == "block-comment":
-            if text.startswith("/*", index):
-                result[index:index + 2] = [" ", " "]
-                block_depth += 1
-                index += 2
-            elif text.startswith("*/", index):
-                result[index:index + 2] = [" ", " "]
-                block_depth -= 1
-                index += 2
-                if block_depth == 0:
-                    state = "code"
-            else:
-                if text[index] != "\n":
-                    result[index] = " "
-                index += 1
-            continue
-        if state == "string":
-            if text[index] == "\\":
-                result[index] = " "
-                if index + 1 < len(text):
-                    if text[index + 1] != "\n":
-                        result[index + 1] = " "
-                    index += 2
-                else:
-                    index += 1
-            else:
-                char = text[index]
-                if char != "\n":
-                    result[index] = " "
-                index += 1
-                if char == '"':
-                    state = "code"
-            continue
-        if state == "raw-string":
-            terminator = '"' + ("#" * raw_hashes)
-            if text.startswith(terminator, index):
-                for offset in range(len(terminator)):
-                    result[index + offset] = " "
-                index += len(terminator)
-                state = "code"
-            else:
-                if text[index] != "\n":
-                    result[index] = " "
-                index += 1
-            continue
-
-        if text.startswith("//", index):
-            result[index:index + 2] = [" ", " "]
-            state = "line-comment"
-            index += 2
-        elif text.startswith("/*", index):
-            result[index:index + 2] = [" ", " "]
-            state = "block-comment"
-            block_depth = 1
-            index += 2
-        elif text[index] == '"':
-            result[index] = " "
-            state = "string"
-            index += 1
-        elif text[index] == "r":
-            raw = re.match(r'r(#{0,16})"', text[index:])
-            if raw:
-                raw_hashes = len(raw.group(1))
-                length = 2 + raw_hashes
-                for offset in range(length):
-                    result[index + offset] = " "
-                index += length
-                state = "raw-string"
-            else:
-                index += 1
-        else:
-            index += 1
-    return "".join(result)
-
-
 def _line_at(text: str, one_based: int) -> str:
     lines = text.splitlines()
     if 1 <= one_based <= len(lines):
@@ -598,5 +456,7 @@ def _candidate_id(
     line: int,
     evidence: str,
 ) -> str:
-    payload = "\0".join((revision or "working-tree", rule_id, path, str(line), evidence))
+    payload = "\0".join(
+        (revision or "working-tree", rule_id, path, str(line), evidence)
+    )
     return f"CAND-{hashlib.sha256(payload.encode('utf-8')).hexdigest()[:16].upper()}"

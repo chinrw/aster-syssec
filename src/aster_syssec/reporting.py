@@ -5,6 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from .models import Catalog, ReviewResult
+from .runs import verify_run_manifest
+
+REVIEW_RESULT_SCHEMA = "https://asterinas.dev/syssec/review-result.schema.json"
+DRIFT_LIST_SCHEMA = "https://asterinas.dev/syssec/drift-list.schema.json"
 
 
 def catalog_markdown(catalog: Catalog) -> str:
@@ -89,40 +93,46 @@ def review_markdown(result: ReviewResult) -> str:
                 f"- Source: `{item.path}:{item.line}` ({item.symbol or 'unknown symbol'})",
                 f"- Evidence: `{item.evidence}`",
                 f"- Review requirement: {item.rationale}",
-                f"- Security impact: not established",
+                "- Security impact: not established",
             ]
         )
     lines.append("")
     return "\n".join(lines)
 
 
-def aggregate_runs(work_root: Path, *, exclude_run: Path | None = None) -> dict[str, Any]:
+def aggregate_runs(
+    work_root: Path, *, exclude_run: Path | None = None
+) -> dict[str, Any]:
     manifests: list[dict[str, Any]] = []
-    candidate_count = 0
+    candidate_ids: set[str] = set()
+    candidate_occurrences = 0
     structural_errors = 0
+    invalid_runs: list[dict[str, str]] = []
     for path in sorted((work_root / "runs").rglob("run-manifest.json")):
         if exclude_run is not None and path.parent.resolve() == exclude_run.resolve():
             continue
         try:
-            manifest = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+            manifest = verify_run_manifest(path)
+        except (OSError, ValueError) as error:
+            invalid_runs.append({"manifest": str(path), "error": str(error)})
             continue
         manifests.append(manifest)
-        findings = path.parent / "review/findings.json"
-        if findings.is_file():
-            try:
-                candidate_count += len(json.loads(findings.read_text(encoding="utf-8"))["candidates"])
-            except (OSError, KeyError, json.JSONDecodeError):
-                pass
-        drift = path.parent / "catalog/drift.json"
-        if drift.is_file():
-            try:
+        for artifact in manifest["outputs"]:
+            artifact_path = path.parent / artifact["path"]
+            if artifact.get("schema") == REVIEW_RESULT_SCHEMA:
+                findings = json.loads(artifact_path.read_text(encoding="utf-8"))
+                ids = {
+                    item["finding_id"]
+                    for item in findings["candidates"]
+                    if isinstance(item.get("finding_id"), str)
+                }
+                candidate_occurrences += len(findings["candidates"])
+                candidate_ids.update(ids)
+            elif artifact.get("schema") == DRIFT_LIST_SCHEMA:
+                drift = json.loads(artifact_path.read_text(encoding="utf-8"))
                 structural_errors += sum(
-                    item.get("severity") == "error"
-                    for item in json.loads(drift.read_text(encoding="utf-8"))
+                    item.get("severity") == "error" for item in drift
                 )
-            except (OSError, json.JSONDecodeError):
-                pass
     return {
         "schema_version": 1,
         "runs": len(manifests),
@@ -130,9 +140,11 @@ def aggregate_runs(work_root: Path, *, exclude_run: Path | None = None) -> dict[
             status: sum(item.get("status") == status for item in manifests)
             for status in ("running", "completed", "failed")
         },
-        "candidates": candidate_count,
+        "candidates": len(candidate_ids),
+        "candidate_occurrences": candidate_occurrences,
         "structural_errors": structural_errors,
         "run_ids": [item.get("run_id") for item in manifests],
+        "invalid_runs": invalid_runs,
     }
 
 
@@ -146,7 +158,9 @@ def aggregate_markdown(summary: dict[str, Any]) -> str:
             f"- Failed: {summary['by_status']['failed']}",
             f"- Still marked running: {summary['by_status']['running']}",
             f"- Static candidates: {summary['candidates']}",
+            f"- Candidate occurrences: {summary['candidate_occurrences']}",
             f"- Structural inventory errors: {summary['structural_errors']}",
+            f"- Invalid or tampered runs: {len(summary['invalid_runs'])}",
             "",
             "Candidates are not confirmed findings.",
             "",

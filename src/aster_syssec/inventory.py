@@ -2,22 +2,20 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from .config import Registry
 from .models import Catalog, DispatchEntry, Drift, EvidenceCoverage, SyscallEntry
+from .routing import TrackRouter
+from .rust_source import RustSourceIndex
 from .source import inspect_source
-
 
 DISPATCH_RE = re.compile(
     r"(?m)^\s*(SYS_[A-Z0-9_]+)\s*=\s*(\d+)\s*=>\s*"
     r"(sys_[a-zA-Z0-9_]+)\s*\(\s*args\s*\[\s*\.\.\s*(\d+)\s*\]"
-)
-HANDLER_RE = re.compile(
-    r"(?ms)\bpub(?:\([^)]*\))?\s+(?:async\s+)?fn\s+"
-    r"(sys_[a-zA-Z0-9_]+)\s*\((.*?)\)\s*->"
 )
 SCML_CALL_RE = re.compile(r"(?m)^\s*([a-z][a-z0-9_]*)\s*\(")
 IDENT_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
@@ -60,6 +58,7 @@ class InventoryBuilder:
         self.registry = registry
 
     def build(self) -> Catalog:
+        router = TrackRouter(self.registry)
         raw_dispatch = self._dispatch_entries()
         handlers = self._handler_index()
         scml_calls, scml_files = self._scml_index()
@@ -118,19 +117,25 @@ class InventoryBuilder:
                     copy_in_operations=handler_info.copy_in if handler_info else (),
                     copy_out_operations=handler_info.copy_out if handler_info else (),
                     kernel_objects_reached=handler_info.objects if handler_info else (),
-                    permission_checks=handler_info.permission_checks if handler_info else (),
+                    permission_checks=handler_info.permission_checks
+                    if handler_info
+                    else (),
                     locks_and_waits=handler_info.locks_waits if handler_info else (),
                     scml=EvidenceCoverage(
                         status="described" if scml_matches else "missing",
                         files=tuple(scml_matches[:50]),
-                        reference_count=sum(scml_calls.get(alias, 0) for alias in evidence_aliases),
+                        reference_count=sum(
+                            scml_calls.get(alias, 0) for alias in evidence_aliases
+                        ),
                     ),
                     regression=EvidenceCoverage(
                         status="referenced" if test_matches else "missing",
                         files=tuple(test_matches[:50]),
-                        reference_count=sum(test_identifiers.get(alias, 0) for alias in aliases),
+                        reference_count=sum(
+                            test_identifiers.get(alias, 0) for alias in aliases
+                        ),
                     ),
-                    security_tracks=self.registry.tracks_for_syscall(
+                    security_tracks=router.syscall_tracks(
                         name,
                         handler_info.path if handler_info else None,
                     ),
@@ -155,13 +160,16 @@ class InventoryBuilder:
         paths = {
             "x86_64": self.source_root / "kernel/core/src/syscall/arch/x86.rs",
             "riscv64": self.source_root / "kernel/core/src/syscall/arch/riscv.rs",
-            "loongarch64": self.source_root / "kernel/core/src/syscall/arch/loongarch.rs",
+            "loongarch64": self.source_root
+            / "kernel/core/src/syscall/arch/loongarch.rs",
         }
         generic_path = self.source_root / "kernel/core/src/syscall/arch/generic.rs"
         generic = self._parse_dispatch_file(generic_path, "generic")
         result: list[_RawDispatch] = []
         for architecture, path in paths.items():
-            specific = self._parse_dispatch_file(path, architecture) if path.is_file() else []
+            specific = (
+                self._parse_dispatch_file(path, architecture) if path.is_file() else []
+            )
             if architecture == "x86_64":
                 result.extend(specific)
                 continue
@@ -213,34 +221,43 @@ class InventoryBuilder:
             if "/arch/" in path.as_posix():
                 continue
             text = path.read_text(encoding="utf-8")
+            index = RustSourceIndex(text)
             relative = path.relative_to(self.source_root).as_posix()
-            for match in HANDLER_RE.finditer(text):
-                symbol, raw_params = match.groups()
-                parameters = _split_parameters(raw_params)
-                types = tuple(param_type for _, param_type in parameters)
+            for function in index.syscall_handlers():
+                symbol = function.symbol
+                types = tuple(parameter.type_name for parameter in function.parameters)
                 pointers = tuple(
-                    name
-                    for name, param_type in parameters
-                    if "Vaddr" in param_type
-                    or "VmReader" in param_type
-                    or "VmWriter" in param_type
-                    or any(token in name.lower() for token in ("ptr", "addr", "user_buf"))
+                    parameter.name
+                    for parameter in function.parameters
+                    if "Vaddr" in parameter.type_name
+                    or "VmReader" in parameter.type_name
+                    or "VmWriter" in parameter.type_name
+                    or any(
+                        token in parameter.name.lower()
+                        for token in ("ptr", "addr", "user_buf")
+                    )
                 )
+                effect_text = index.code_for(index.reachable_from((symbol,)))
                 result[symbol] = _HandlerInfo(
                     path=relative,
-                    line=text.count("\n", 0, match.start()) + 1,
+                    line=function.start_line,
                     types=types,
                     user_pointers=pointers,
-                    copy_in=_operation_names(text, _COPY_IN_PATTERNS),
-                    copy_out=_operation_names(text, _COPY_OUT_PATTERNS),
-                    objects=_operation_names(text, _OBJECT_PATTERNS),
-                    permission_checks=_operation_names(text, _PERMISSION_PATTERNS),
-                    locks_waits=_operation_names(text, _LOCK_WAIT_PATTERNS),
+                    copy_in=_operation_names(effect_text, _COPY_IN_PATTERNS),
+                    copy_out=_operation_names(effect_text, _COPY_OUT_PATTERNS),
+                    objects=_operation_names(effect_text, _OBJECT_PATTERNS),
+                    permission_checks=_operation_names(
+                        effect_text, _PERMISSION_PATTERNS
+                    ),
+                    locks_waits=_operation_names(effect_text, _LOCK_WAIT_PATTERNS),
                 )
         return result
 
     def _scml_index(self) -> tuple[dict[str, int], dict[str, set[str]]]:
-        root = self.source_root / "book/src/kernel/linux-compatibility/syscall-flag-coverage"
+        root = (
+            self.source_root
+            / "book/src/kernel/linux-compatibility/syscall-flag-coverage"
+        )
         counts: dict[str, int] = defaultdict(int)
         files: dict[str, set[str]] = defaultdict(set)
         if not root.is_dir():
@@ -267,7 +284,11 @@ class InventoryBuilder:
             relative = path.relative_to(self.source_root).as_posix()
             identifiers = IDENT_RE.findall(text)
             for name in identifiers:
-                normalized = name.removeprefix("SYS_").lower() if name.startswith("SYS_") else name
+                normalized = (
+                    name.removeprefix("SYS_").lower()
+                    if name.startswith("SYS_")
+                    else name
+                )
                 counts[normalized] += 1
                 files[normalized].add(relative)
         return counts, files
@@ -286,7 +307,9 @@ class InventoryBuilder:
         for item in raw_dispatch:
             key = (item.architecture, item.number)
             previous = number_index.get(key)
-            if previous and (previous.name != item.name or previous.handler != item.handler):
+            if previous and (
+                previous.name != item.name or previous.handler != item.handler
+            ):
                 drift.append(
                     Drift(
                         kind="duplicate-syscall-number",
@@ -304,7 +327,10 @@ class InventoryBuilder:
 
         seen_missing_handlers: set[str] = set()
         for item in syscalls:
-            if item.handler not in handlers and item.handler not in seen_missing_handlers:
+            if (
+                item.handler not in handlers
+                and item.handler not in seen_missing_handlers
+            ):
                 seen_missing_handlers.add(item.handler)
                 drift.append(
                     Drift(
@@ -354,9 +380,7 @@ class InventoryBuilder:
                 )
 
         known_scml_names = {
-            alias
-            for aliases in handler_aliases.values()
-            for alias in aliases
+            alias for aliases in handler_aliases.values() for alias in aliases
         } | {handler.removeprefix("sys_") for handler in handler_aliases}
         for name in tuple(known_scml_names):
             known_scml_names.update(SCML_ALIASES.get(name, ()))
@@ -367,15 +391,20 @@ class InventoryBuilder:
                         kind="scml-without-dispatch",
                         severity="warning",
                         syscall=name,
-                        path=sorted(paths)[0],
+                        path=min(paths),
                         message=f"SCML declares {name}, but no matching dispatched handler was found",
                     )
                 )
-        return sorted(drift, key=lambda item: (item.severity != "error", item.kind, item.syscall or ""))
+        return sorted(
+            drift,
+            key=lambda item: (item.severity != "error", item.kind, item.syscall or ""),
+        )
 
 
 def compare_baseline(catalog: Catalog, baseline: dict[str, Any]) -> tuple[Drift, ...]:
-    if baseline.get("schema_version") != 1 or not isinstance(baseline.get("syscalls"), list):
+    if baseline.get("schema_version") != 1 or not isinstance(
+        baseline.get("syscalls"), list
+    ):
         raise ValueError("baseline catalog must be a schema_version 1 syscall catalog")
     baseline_by_name = {item["name"]: item for item in baseline["syscalls"]}
     additions: list[Drift] = []
@@ -423,7 +452,9 @@ def compare_baseline(catalog: Catalog, baseline: dict[str, Any]) -> tuple[Drift,
             old = previous_arches.get(architecture)
             new = current_arches.get(architecture)
             old_shape = (
-                {"number": old.get("number"), "arity": old.get("arity")} if isinstance(old, dict) else None
+                {"number": old.get("number"), "arity": old.get("arity")}
+                if isinstance(old, dict)
+                else None
             )
             if old_shape != new:
                 additions.append(
@@ -435,7 +466,10 @@ def compare_baseline(catalog: Catalog, baseline: dict[str, Any]) -> tuple[Drift,
                         message=f"{current.name} {architecture} dispatch changed from {old_shape} to {new}",
                     )
                 )
-        if previous.get("scml", {}).get("status") == "described" and current.scml.status != "described":
+        if (
+            previous.get("scml", {}).get("status") == "described"
+            and current.scml.status != "described"
+        ):
             additions.append(
                 Drift(
                     kind="scml-coverage-regressed",
@@ -445,7 +479,10 @@ def compare_baseline(catalog: Catalog, baseline: dict[str, Any]) -> tuple[Drift,
                     message=f"{current.name} lost its baseline SCML evidence",
                 )
             )
-        if previous.get("regression", {}).get("status") == "referenced" and current.regression.status != "referenced":
+        if (
+            previous.get("regression", {}).get("status") == "referenced"
+            and current.regression.status != "referenced"
+        ):
             additions.append(
                 Drift(
                     kind="regression-coverage-regressed",
@@ -468,37 +505,13 @@ def compare_baseline(catalog: Catalog, baseline: dict[str, Any]) -> tuple[Drift,
     return tuple(additions)
 
 
-def _split_parameters(raw: str) -> list[tuple[str, str]]:
-    result: list[tuple[str, str]] = []
-    current: list[str] = []
-    depth = 0
-    for char in raw:
-        if char in "(<[{":
-            depth += 1
-        elif char in ")>]}":
-            depth = max(depth - 1, 0)
-        if char == "," and depth == 0:
-            _append_parameter(result, "".join(current))
-            current = []
-        else:
-            current.append(char)
-    _append_parameter(result, "".join(current))
-    return result
-
-
-def _append_parameter(result: list[tuple[str, str]], raw: str) -> None:
-    raw = raw.strip()
-    if not raw or ":" not in raw:
-        return
-    name, param_type = raw.split(":", 1)
-    result.append((name.strip().removeprefix("mut "), " ".join(param_type.split())))
-
-
 def _strip_line_comments(text: str) -> str:
     return "\n".join(line.split("//", 1)[0] for line in text.splitlines())
 
 
-def _operation_names(text: str, patterns: Iterable[tuple[str, re.Pattern[str]]]) -> tuple[str, ...]:
+def _operation_names(
+    text: str, patterns: Iterable[tuple[str, re.Pattern[str]]]
+) -> tuple[str, ...]:
     return tuple(name for name, pattern in patterns if pattern.search(text))
 
 
@@ -525,7 +538,10 @@ _OBJECT_PATTERNS = (
 )
 _PERMISSION_PATTERNS = (
     ("capability-check", re.compile(r"\b(?:check_[a-z_]*cap|CapSet::|capable)\b")),
-    ("access-check", re.compile(r"\b(?:check_[a-z_]*(?:access|permission)|may_[a-z_]+)\b")),
+    (
+        "access-check",
+        re.compile(r"\b(?:check_[a-z_]*(?:access|permission)|may_[a-z_]+)\b"),
+    ),
 )
 _LOCK_WAIT_PATTERNS = (
     ("lock", re.compile(r"\.(?:lock|read|write)\s*\(")),

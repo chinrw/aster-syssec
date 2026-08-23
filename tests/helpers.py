@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -108,13 +109,13 @@ def write_specula_inputs(root: Path) -> tuple[Path, Path]:
     specula = root / "Specula"
     profile.mkdir(parents=True, exist_ok=True)
     specula.mkdir(parents=True, exist_ok=True)
-    (specula / "pyproject.toml").write_text("[project]\nname = \"specula-fixture\"\n", encoding="utf-8")
+    (specula / "pyproject.toml").write_text(
+        '[project]\nname = "specula-fixture"\n', encoding="utf-8"
+    )
     config = {
         "version": 1,
         "default_profile": "review",
-        "profiles": {
-            "review": {"agent": "codex", "model": "fixture", "effort": "low"}
-        },
+        "profiles": {"review": {"agent": "codex", "model": "fixture", "effort": "low"}},
         "phases": {"review": "review"},
     }
     (profile / "specula-asterinas-hybrid.json").write_text(
@@ -123,5 +124,29 @@ def write_specula_inputs(root: Path) -> tuple[Path, Path]:
     )
     guidance = profile / "guidance/06-socket-ancillary-data.md"
     guidance.parent.mkdir(parents=True, exist_ok=True)
-    guidance.write_text("# Goal\n\nReview one socket commit protocol.\n", encoding="utf-8")
+    guidance.write_text(
+        "# Goal\n\nReview one socket commit protocol.\n", encoding="utf-8"
+    )
     return profile, specula
+
+
+def init_git_repository(root: Path) -> str:
+    subprocess.run(
+        ["git", "init", "-b", "main"], cwd=root, check=True, capture_output=True
+    )
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=root, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"], cwd=root, check=True
+    )
+    subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=root, check=True)
+    subprocess.run(["git", "add", "."], cwd=root, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "fixture"], cwd=root, check=True, capture_output=True
+    )
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()

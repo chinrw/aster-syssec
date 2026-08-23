@@ -2,9 +2,11 @@
 
 Observed on 2026-08-23 against:
 
-- Asterinas `604948581512d83734377974d4c34adb4530f2d7`;
-- branch `main`, tracking official `upstream/main`;
-- only pre-existing dirt: `?? asterinas-onboarding.html`;
+- the flake-locked Asterinas source at
+  `604948581512d83734377974d4c34adb4530f2d7`;
+- reviewer version `0.2.0`, developed from
+  `c7c9511194b11bea7d9965f7851b59dd57b434bd` with the changes in this
+  working tree recorded by the manifest dirty hash;
 - Rust `nightly-2026-07-21`;
 - Specula profile config SHA-256
   `295387706ec59d368272c771e6a9404f2e246321d64c141d6fc11a395c95ac42`.
@@ -13,15 +15,30 @@ Observed on 2026-08-23 against:
 
 ```text
 PYTHONPATH=src python3 -m unittest discover -v
-12 tests passed
+37 tests passed
 ```
 
-The tests cover dispatch merging, structural/coverage drift separation,
-baseline regression policy, comment/string masking, handler versus selected
-scope, rule filtering, candidate-only semantics, run-manifest ordering,
-linked-worktree blocking, and non-executing agent-review handoffs.
+The tests cover:
 
-## Live inventory
+- disjoint source/evidence roots in both containment directions;
+- rejection of Git revision inheritance from a source directory's parent;
+- function-local inventory effects and same-file helper propagation;
+- Rust comments, strings, character literals, lifetimes, and `pub(super)`
+  parameter parsing;
+- one Track-routing contract for catalog, selection, and candidates;
+- strict engine, source-root, guidance, syscall, and Specula config checks;
+- schema validation, artifact hashes, source stability, terminal run states,
+  tamper detection, and candidate deduplication;
+- exact merge-base agent handoffs and changed-input rejection;
+- unique Specula run IDs and history-preserving linked-worktree export.
+
+The evidence-integrity tests start from controls that reproduced each reported
+failure: overlapping roots created source-side output, handler effects leaked
+between functions, invalid Track configuration was accepted, artifacts could
+change after registration, and handoffs followed mutable inputs. Each control
+now fails closed while the corresponding unchanged-input path completes.
+
+## Pinned Asterinas integration
 
 ```text
 250 catalog entries
@@ -31,10 +48,16 @@ loongarch64: 208
 structural errors: 0
 coverage warnings: 61
 inventory --check exit: 0
+config-check issues: 0
 ```
 
 The 61 warnings are 59 missing regression-source references and 2 missing SCML
 declarations. They are not reported as security findings.
+
+The generated catalog distinguishes handlers sharing `epoll.rs`: create and
+control handlers have no copy-out operation, wait handlers have `write_val`,
+and `epoll_pwait2` has both `read_val` and `write_val`. This is the regression
+control for the former whole-file effect pollution.
 
 ## Live static review
 
@@ -52,8 +75,8 @@ The results include the `recvmsg` message-consumption/copy-out ordering path,
 `sendmmsg` address arithmetic and post-send copy-out, flag truncation, typed
 copy-out, and low-confidence guard-lifetime questions. They remain candidates.
 
-The explicit `--scope selected` pass scanned all 134 files and 851 functions,
-producing 156 track-scoped candidates. It does not claim those functions are
+The explicit `--scope selected` pass scanned all 134 files and 825 functions,
+producing 155 track-scoped candidates. It does not claim those functions are
 syscall reachable; `--rule` can narrow that exhaustive pass by mechanism.
 
 `abi-integer-layout`:
@@ -61,7 +84,7 @@ syscall reachable; `--rule` can narrow that exhaustive pass by mechanism.
 ```text
 selected files: 182
 files with scanned code: 177
-functions scanned: 426
+functions scanned: 420
 candidates: 238
 confirmed findings: 0
 ```
@@ -69,24 +92,34 @@ confirmed findings: 0
 The central dispatcher's repeated `as _` macro pattern is represented by one
 systemic candidate rather than one candidate per argument expansion.
 
+The previous parser counted 426 functions. The six removed entries were trait
+method declarations ending in `;` that the old brace search attached to later
+implementation bodies. The reachable symbol set and all 238 ABI candidates
+were retained.
+
 ## Adapter validation
 
-The linked-worktree export completed without editing the authoritative checkout:
+The linked-worktree export was exercised through a clean temporary clone of
+the Asterinas history. It completed without editing the authoritative checkout:
 
 ```text
-kind: git-archive
-revision: 604948581512d83734377974d4c34adb4530f2d7
-archive SHA-256: 8b85718d9c7f6cdd35c50016382fe1f2cffd612c9fabdb24eacfde4e2827f479
+kind: git-bundle-clone
+history scope: ancestors-of-exact-head
+independent .git directory: yes
+object alternates: none
+detached exact HEAD: yes
+preflight after preparation: verified
 ```
 
-The exported `kernel/core/src/syscall/recvmsg.rs` is byte-identical to HEAD.
-The generated Specula command contains `--dry-run`; it was not executed.
+The exported checkout is clean and retains local history for archaeology. The
+generated Specula command contains `--dry-run`; Specula was not executed.
 
 The generated Asterinas agent-review target passed the checkout's deterministic
 `resolve_target.sh --meta` parser in files mode. No review agent was started.
 
-Raw validation runs are under `/tmp/aster-syssec-validation` on the validation
-host and are not source-controlled artifacts.
+Pinned integration evidence is under `/tmp/aster-syssec-final-v02.6mcs0u` on the
+validation host. A final `report` verified every registered artifact and
+reported no invalid runs. These temporary files are not source-controlled.
 
 ## Nix flake
 
@@ -99,8 +132,15 @@ asterinas-src: 604948581512d83734377974d4c34adb4530f2d7
 syzkaller-src: 1e72964b0111319984575e60f266d1fa0a98abb5
 ```
 
-`nix flake check` passes. The package check runs the Python tests, Pyright, and
-JSON metaschema validation in the Nix sandbox.
+`nix flake check path:. --print-build-logs` passes. The package check runs the
+37 Python tests, Ruff lint and formatting, Pyright, JSON metaschema validation,
+Actionlint, and ShellCheck in the Nix sandbox. The package imports successfully
+and `nix run path:. -- --version` reports `aster-syssec 0.2.0`.
+
+An installed-package run recorded the reviewer content, rule set, schema set,
+and `flake.lock` SHA-256 values plus the output size, schema hash, and artifact
+hash. The path-input build has no Git metadata, so its exact content hash is
+the package identity; a clean Git flake build additionally records `self.rev`.
 
 The toolchain contract built and checked:
 

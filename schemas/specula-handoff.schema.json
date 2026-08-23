@@ -3,25 +3,97 @@
   "$id": "https://asterinas.dev/syssec/specula-handoff.schema.json",
   "title": "Gated Specula handoff",
   "type": "object",
+  "additionalProperties": false,
   "required": [
-    "schema_version", "ready", "blockers", "stage", "track",
-    "specula_readiness", "requires_human_gate_after_stage", "source",
-    "artifact", "execution_identity", "next_gate"
+    "schema_version",
+    "kind",
+    "ready",
+    "blockers",
+    "stage",
+    "track",
+    "specula_readiness",
+    "requires_human_gate_after_stage",
+    "source",
+    "artifact",
+    "source_export",
+    "execution_identity",
+    "direct_command",
+    "nix_command",
+    "preflight",
+    "next_gate"
   ],
   "properties": {
     "schema_version": { "const": 1 },
+    "kind": { "const": "specula" },
     "ready": { "type": "boolean" },
     "blockers": { "type": "array", "items": { "type": "string" } },
     "stage": { "enum": ["dry-run", "analysis"] },
     "track": { "type": "string" },
     "specula_readiness": { "type": "string" },
     "requires_human_gate_after_stage": { "const": true },
-    "source": { "type": "object" },
+    "source": { "$ref": "#/$defs/source" },
     "artifact": { "type": "string" },
     "source_export": { "type": ["object", "null"] },
-    "execution_identity": { "type": "object" },
+    "execution_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_revision",
+        "source_dirty_hash",
+        "agent_config",
+        "agent_config_sha256",
+        "guidance",
+        "guidance_sha256",
+        "target",
+        "run_id"
+      ],
+      "properties": {
+        "source_revision": { "type": ["string", "null"] },
+        "source_dirty_hash": { "$ref": "#/$defs/sha256" },
+        "agent_config": { "type": "string" },
+        "agent_config_sha256": { "$ref": "#/$defs/sha256" },
+        "guidance": { "type": "string" },
+        "guidance_sha256": { "$ref": "#/$defs/sha256" },
+        "target": { "type": "string" },
+        "run_id": { "type": "string" }
+      }
+    },
     "direct_command": { "type": ["string", "null"] },
     "nix_command": { "type": ["string", "null"] },
+    "preflight": { "$ref": "#/$defs/preflight" },
     "next_gate": { "type": "string" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "required": ["path", "revision", "dirty_hash", "dirty_entries", "git_dir_kind"],
+      "properties": {
+        "path": { "type": "string" },
+        "revision": { "type": ["string", "null"] },
+        "dirty_hash": { "$ref": "#/$defs/sha256" },
+        "dirty_entries": { "type": "array", "items": { "type": "string" } },
+        "git_dir_kind": { "enum": ["directory", "file", "absent"] }
+      }
+    },
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer", "checkouts", "files"],
+      "properties": {
+        "reviewer": { "type": "object" },
+        "checkouts": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/source" }
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    }
   }
 }

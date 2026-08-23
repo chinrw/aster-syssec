@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/drift-list.schema.json",
+  "title": "Syscall catalog drift list",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["kind", "severity", "message", "syscall", "path"],
+    "properties": {
+      "kind": { "type": "string" },
+      "severity": { "enum": ["error", "warning", "info"] },
+      "message": { "type": "string" },
+      "syscall": { "type": ["string", "null"] },
+      "path": { "type": ["string", "null"] }
+    }
+  }
+}
