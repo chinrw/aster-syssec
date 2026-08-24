@@ -1,182 +1,132 @@
 # Validation
 
-Observed on 2026-08-23 against:
+Observed on 2026-08-24 against clean revisions:
 
-- the flake-locked Asterinas source at
-  `604948581512d83734377974d4c34adb4530f2d7`;
-- reviewer version `0.2.0`, developed from
-  `c7c9511194b11bea7d9965f7851b59dd57b434bd` with the changes in this
-  working tree recorded by the manifest dirty hash;
-- Rust `nightly-2026-07-21`;
-- Specula profile config SHA-256
-  `295387706ec59d368272c771e6a9404f2e246321d64c141d6fc11a395c95ac42`.
+- aster-syssec `5f8f38cfd8a05397e1ac17a777d985102ef81dbc`;
+- Asterinas `490960ace3e15bf74146e406ec11a9425755cfba`;
+- Rust `nightly-2026-07-21` for Miri, layout, fuzz, and Loom;
+- Kani `0.67.0` with CBMC `6.8.0`.
 
-## Automated tests
+The flake locks `chinrw/asterinas` at that Asterinas revision with NAR hash
+`sha256-IjQP49RonXGFv0Bg9KagDJ3ml58F8pePM2p0A0ANpsA=`.
 
-```text
-PYTHONPATH=src python3 -m unittest discover -v
-37 tests passed
+## Package and checkout gates
+
+```sh
+nix flake check --no-update-lock-file --print-build-logs
 ```
 
-The tests cover:
-
-- disjoint source/evidence roots in both containment directions;
-- rejection of Git revision inheritance from a source directory's parent;
-- function-local inventory effects and same-file helper propagation;
-- Rust comments, strings, character literals, lifetimes, and `pub(super)`
-  parameter parsing;
-- one Track-routing contract for catalog, selection, and candidates;
-- strict engine, source-root, guidance, syscall, and Specula config checks;
-- schema validation, artifact hashes, source stability, terminal run states,
-  tamper detection, and candidate deduplication;
-- exact merge-base agent handoffs and changed-input rejection;
-- unique Specula run IDs and history-preserving linked-worktree export.
-
-The evidence-integrity tests start from controls that reproduced each reported
-failure: overlapping roots created source-side output, handler effects leaked
-between functions, invalid Track configuration was accepted, artifacts could
-change after registration, and handoffs followed mutable inputs. Each control
-now fails closed while the corresponding unchanged-input path completes.
-
-## Pinned Asterinas integration
+Result:
 
 ```text
-250 catalog entries
-x86_64: 245
-riscv64: 208
-loongarch64: 208
-structural errors: 0
-coverage warnings: 61
-inventory --check exit: 0
-config-check issues: 0
+55 unit tests passed
+Ruff lint and format passed
+Pyright passed
+JSON Schema metaschema validation passed
+Actionlint passed
+ShellCheck passed
+all checks passed
 ```
 
-The 61 warnings are 59 missing regression-source references and 2 missing SCML
-declarations. They are not reported as security findings.
-
-The generated catalog distinguishes handlers sharing `epoll.rs`: create and
-control handlers have no copy-out operation, wait handlers have `write_val`,
-and `epoll_pwait2` has both `read_val` and `write_val`. This is the regression
-control for the former whole-file effect pollution.
-
-## Live static review
-
-`socket-cmsg-iovec`:
+`scripts/ci-integration.sh` ran `config-check`, `inventory --check`, and
+`targets check` against the flake-locked source. Target preflight reported:
 
 ```text
-selected files: 134
-files with scanned handler/local-callee code: 14
-functions scanned: 18
-candidates after same-file reachability: 28
-confirmed findings: 0
+targets: 11
+issues: 0
+status: ok
 ```
 
-The results include the `recvmsg` message-consumption/copy-out ordering path,
-`sendmmsg` address arithmetic and post-send copy-out, flag truncation, typed
-copy-out, and low-confidence guard-lifetime questions. They remain candidates.
+## Host verification profile
 
-The explicit `--scope selected` pass scanned all 134 files and 825 functions,
-producing 155 track-scoped candidates. It does not claim those functions are
-syscall reachable; `--rule` can narrow that exhaustive pass by mechanism.
-
-`abi-integer-layout`:
+The clean nightly run is stored at:
 
 ```text
-selected files: 182
-files with scanned code: 177
-functions scanned: 420
-candidates: 238
-confirmed findings: 0
+/tmp/asterinas-syssec-v03.cIgpRt/work/runs/490960ace3e1/20260824T075618Z-run-profile-417f4e9c
 ```
 
-The central dispatcher's repeated `as _` macro pattern is represented by one
-systemic candidate rather than one candidate per argument expansion.
+The run manifest records clean source and reviewer dirty hashes, reviewer
+commit `5f8f38c...`, Asterinas commit `490960ace...`, and verified integrity for
+`profile/result.json`.
 
-The previous parser counted 426 functions. The six removed entries were trait
-method declarations ending in `;` that the old brace search attached to later
-implementation bodies. The reachable symbol set and all 238 ABI candidates
-were retained.
+| Engine | Targets | Result |
+| --- | ---: | --- |
+| Kani | 5 | pass |
+| Miri | 1 | pass |
+| bare-metal layout | 3 | pass |
+| cargo-fuzz | 1 | pass, 1000/1000 runs |
+| Loom | 1 | pass |
 
-## Adapter validation
+All Kani proofs used unwind 8 and reported sufficient unwind. Layout matched
+the expected 16-byte, 8-byte-aligned `UserIoVec` on x86-64, RISC-V 64, and
+LoongArch 64. Loom used 1000 max branches, 3 max preemptions, and 10000 max
+permutations.
 
-The linked-worktree export was exercised through a clean temporary clone of
-the Asterinas history. It completed without editing the authoritative checkout:
+Stable expected outcomes are recorded in
+`docs/v0.3-host-results.json`. Run-local result IDs are excluded because the
+fuzz adapter intentionally places a shadow manifest below each run root.
+
+## Asterinas integration
+
+The original mixed commits were split and replayed onto upstream Asterinas
+`2bcd1ae127794d2d5c49019cd8ace1ff4dbf8e98`:
+
+| Branch | Commit | Scope |
+| --- | --- | --- |
+| `syssec-uapi-seams` | `bb2c0f5e236b7b38478b4961565350716bcfe5d4` | UAPI helper, production iovec integration, Kani, Miri, layout, fuzz |
+| `syssec-fd-protocol` | `13cf3c95ae0be904ef1e1729e9e379b66f0964c7` | reserved FD protocol, FileTable/pipe2/pidfd integration, Loom |
+| `syssec-runtime-harness` | `490960ace3e15bf74146e406ec11a9425755cfba` | isolated initramfs runner, hostfwd disable, partial-EFAULT case |
+
+All three branches exist on `chinrw/asterinas`. Each commit has a
+`Signed-off-by` trailer. The temporary clone could not reach the SSH signing
+agent, so these three commits are unsigned.
+
+Validation on the final stack included:
 
 ```text
-kind: git-bundle-clone
-history scope: ancestors-of-exact-head
-independent .git directory: yes
-object alternates: none
-detached exact HEAD: yes
-preflight after preparation: verified
+aster-uapi host tests: 5 passed
+aster-fd-protocol host tests: 2 passed
+workspace Rust format and clippy: passed
+non-default workspace members: passed
+partial_efault_json clang-format: passed
+run_syssec_case.sh ShellCheck: passed
+changed-file typos check: passed
 ```
 
-The exported checkout is clean and retains local history for archaeology. The
-generated Specula command contains `--dry-run`; Specula was not executed.
+The development image lacks `nixfmt`, so its monolithic `make check` exited
+127 after the Rust checks. Host `nixfmt --check distro` also reports formatting
+differences already present at upstream base `2bcd1ae...`; no Nix file changed
+in this stack. This is not recorded as a full `make check` pass.
 
-The generated Asterinas agent-review target passed the checkout's deterministic
-`resolve_target.sh --meta` parser in files mode. No review agent was started.
+## TCG runtime smoke
 
-Pinned integration evidence is under `/tmp/aster-syssec-final-v02.6mcs0u` on the
-validation host. A final `report` verified every registered artifact and
-reported no invalid runs. These temporary files are not source-controlled.
+The final runtime stack was built and booted with:
 
-## Nix flake
-
-Locked inputs:
-
-```text
-nixpkgs:       2c423e03bbafcff28bfadc6781a4a8257f205cb5
-rust-overlay:  f60c1b57ff805a46b5175c76fc981fb4f81efbcc
-asterinas-src: 604948581512d83734377974d4c34adb4530f2d7
-syzkaller-src: 1e72964b0111319984575e60f266d1fa0a98abb5
+```sh
+make run_kernel \
+  AUTO_TEST=syssec \
+  SYSSEC_CASE=io/file_io/partial_efault_json \
+  TARGET_ARCH=x86_64 \
+  ENABLE_KVM=0 \
+  QEMU_HOSTFWD=off
 ```
 
-`nix flake check path:. --print-build-logs` passes. The package check runs the
-37 Python tests, Ruff lint and formatting, Pyright, JSON metaschema validation,
-Actionlint, and ShellCheck in the Nix sandbox. The package imports successfully
-and `nix run path:. -- --version` reports `aster-syssec 0.2.0`.
+The guest emitted exactly one marker-delimited object, and the Makefile marker
+postcondition exited zero:
 
-An installed-package run recorded the reviewer content, rule set, schema set,
-and `flake.lock` SHA-256 values plus the output size, schema hash, and artifact
-hash. The path-input build has no Git metadata, so its exact content hash is
-the package identity; a clean Git flake build additionally records `self.rev`.
-
-The toolchain contract built and checked:
-
-```text
-rustc 1.99.0-nightly (87e5904f5 2026-07-20)
-miri 0.1.0 (87e5904f5e 2026-07-20)
-x86_64-unknown-none
-riscv64imac-unknown-none-elf
-loongarch64-unknown-none-softfloat
+```json
+{"case_id":"pipe-partial-efault-read","exit_kind":"normal","return":-1,"errno":14,"first_byte":65,"remaining_return":2,"remaining_errno":0,"remaining_byte_0":65,"remaining_byte_1":66}
 ```
 
-Formal-shell smoke results:
+This is a contract-baseline smoke result. It is not differential evidence and
+is not a finding.
 
-```text
-cargo-fuzz 0.13.2
-OpenJDK 21.0.12
-Maven 3.9.16
-LLVM/Clang 21.1.8
-Kani installer 0.67.0
-```
+## CI profiles
 
-The Kani bundle was installed into an isolated `/tmp` cache and verified
-`tests/fixtures/kani_smoke.rs` with CBMC 6.8.0:
+Pull requests and pushes run five Kani targets, Miri, x86-64 layout, and the
+bounded Loom model. The scheduled nightly job runs all 11 targets, adding both
+other layouts and the 1000-run fuzz campaign. Both jobs upload the evidence
+root even after failure.
 
-```text
-VERIFICATION:- SUCCESSFUL
-Complete - 1 successfully verified harnesses, 0 failures, 1 total.
-```
-
-The custom syzkaller derivation builds the source and Go module closure pinned
-by the lock. Manager, executor, and execprog are executable; the manager embeds
-revision `1e72964b0111319984575e60f266d1fa0a98abb5`. The kernel-fuzz shell also
-reports Go 1.26.5 and QEMU 11.1.0.
-
-During the first Kani setup validation, before the final `RUSTUP_HOME`
-isolation was added, the installer placed `nightly-2025-11-21` in the user's
-default rustup home. It was not removed. The final shell supplies Nix rustup and
-sets Kani's `RUSTUP_HOME` below the aster-syssec cache; a fresh-cache rerun
-confirmed the corrected location.
+SMP regression, LTP, kselftest, gVisor, and the differential corpus remain
+explicit external requirements.
