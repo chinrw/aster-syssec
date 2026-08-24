@@ -1,0 +1,17 @@
+version = 1
+id = "iovec-supported-index-offset"
+engine = "kani"
+track = "user-memory-partial-io"
+properties = ["BOUNDARY-VALIDATION"]
+package = "aster-uapi"
+harness = "proof_supported_iovec_index_offset_does_not_wrap"
+source_symbols = ["iovec_entry_addr", "MAX_IO_VECTOR_LENGTH"]
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+unwind = 8
+
+[policy]
+expected = "pass"
+pr_blocking = true

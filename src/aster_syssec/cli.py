@@ -17,8 +17,11 @@ from .config import (
     validate_registry_against_checkout,
 )
 from .doctor import run_doctor
+from .engines import EngineContext, doctor_engine, execute_target
 from .handoff import verify_handoff
 from .inventory import InventoryBuilder, compare_baseline
+from .profile_commands import ProfileCommandContext, execute_profile_command
+from .profiles import load_profile_registry
 from .reporting import (
     aggregate_markdown,
     aggregate_runs,
@@ -27,9 +30,11 @@ from .reporting import (
 )
 from .runs import RunContext
 from .scanner import RULE_IDS, StaticReviewer
+from .schemas import validate_instance
 from .selection import select_review_paths
 from .source import ensure_asterinas_checkout
 from .specula import prepare_handoff
+from .targets import load_target_registry, validate_targets_against_checkout
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -164,6 +169,53 @@ def build_parser() -> argparse.ArgumentParser:
     tracks.add_argument("--config-root", type=Path)
     tracks.add_argument("--json", action="store_true")
     tracks.set_defaults(handler=_tracks)
+
+    targets = subparsers.add_parser(
+        "targets", help="inspect configured verification targets"
+    )
+    target_commands = targets.add_subparsers(dest="target_command", required=True)
+    targets_list = target_commands.add_parser(
+        "list", help="list validated verification targets"
+    )
+    targets_list.add_argument("--config-root", type=Path)
+    targets_list.add_argument("--target-root", type=Path)
+    targets_list.add_argument("--json", action="store_true")
+    targets_list.set_defaults(handler=_targets_list)
+    targets_check = target_commands.add_parser(
+        "check", help="validate targets against an Asterinas checkout"
+    )
+    _add_source_options(targets_check)
+    targets_check.add_argument("--target-root", type=Path)
+    targets_check.add_argument("--json", action="store_true")
+    targets_check.set_defaults(handler=_targets_check)
+
+    run_target = subparsers.add_parser(
+        "run-target", help="execute one verification target and normalize its evidence"
+    )
+    _add_source_options(run_target)
+    run_target.add_argument("--target-root", type=Path)
+    run_target.add_argument("--target", required=True)
+    run_target.add_argument("--json", action="store_true")
+    run_target.set_defaults(handler=_run_target)
+
+    engine = subparsers.add_parser("engine", help="inspect verification engines")
+    engine_commands = engine.add_subparsers(dest="engine_command", required=True)
+    engine_doctor = engine_commands.add_parser(
+        "doctor", help="check whether one engine adapter and tool are callable"
+    )
+    engine_doctor.add_argument("--engine", required=True)
+    engine_doctor.add_argument("--json", action="store_true")
+    engine_doctor.set_defaults(handler=_engine_doctor)
+
+    run_profile = subparsers.add_parser("run", help="execute one verification profile")
+    _add_source_options(run_profile)
+    run_profile.add_argument("--profile", required=True)
+    run_profile.add_argument("--profile-config", type=Path)
+    run_profile.add_argument("--target-root", type=Path)
+    run_profile.add_argument("--changed-from")
+    run_profile.add_argument("--baseline", type=Path)
+    run_profile.add_argument("--json", action="store_true")
+    run_profile.set_defaults(handler=_run_profile)
 
     verify = subparsers.add_parser(
         "verify-handoff",
@@ -585,6 +637,221 @@ def _tracks(args: argparse.Namespace) -> int:
         for item in values:
             print(f"{item['id']}: {item['description']} [{item['specula_readiness']}]")
     return 0
+
+
+def _targets_list(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    targets = load_target_registry(registry, args.target_root)
+    values = [target.summary() for target in targets.targets.values()]
+    if args.json:
+        print(json.dumps(values, indent=2, sort_keys=True))
+    else:
+        for item in values:
+            print(
+                f"{item['id']}: {item['engine']} {item['track']} "
+                f"expected={item['expected']} pr_blocking={str(item['pr_blocking']).lower()}"
+            )
+    return 0
+
+
+def _targets_check(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    targets = load_target_registry(registry, args.target_root)
+    run = _start_run(
+        args,
+        registry,
+        "targets-check",
+        {
+            "target_root": _optional_path(args.target_root),
+            "target_registry_hash": targets.config_hash,
+        },
+    )
+    try:
+        ensure_asterinas_checkout(args.asterinas)
+        issues = validate_targets_against_checkout(targets, args.asterinas)
+        result = {
+            "schema_version": 1,
+            "status": "fail" if issues else "ok",
+            "target_registry_hash": targets.config_hash,
+            "targets": len(targets.targets),
+            "issues": [item.__dict__ for item in issues],
+        }
+        output = run.write_json(
+            "targets/check.json",
+            result,
+            schema="target-check.schema.json",
+        )
+        run.complete([output])
+    except BaseException as error:
+        run.fail(error)
+        raise
+    _print_result(
+        args.json,
+        result,
+        f"targets check: {result['status']}, {len(issues)} issues; run={run.root}",
+    )
+    return 1 if issues else 0
+
+
+def _run_target(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    targets = load_target_registry(registry, args.target_root)
+    target = targets.require(args.target)
+    work_root = _work_root(args.work_root)
+    run = RunContext.start(
+        work_root=work_root,
+        command="run-target",
+        source_root=args.asterinas,
+        registry=registry,
+        parameters={
+            "target": target.id,
+            "target_config_sha256": target.config_sha256,
+            "target_registry_hash": targets.config_hash,
+        },
+    )
+    try:
+        ensure_asterinas_checkout(args.asterinas)
+        target_issues = tuple(
+            issue
+            for issue in validate_targets_against_checkout(targets, args.asterinas)
+            if issue.target == target.id
+        )
+        if target_issues:
+            detail = "; ".join(issue.detail for issue in target_issues)
+            raise ValueError(
+                f"verification target {target.id} is not executable: {detail}"
+            )
+        execution = execute_target(
+            target,
+            EngineContext(
+                source_root=args.asterinas.resolve(),
+                work_root=work_root,
+                run=run,
+            ),
+        )
+        run.complete()
+    except BaseException as error:
+        run.fail(error)
+        raise
+    summary = {
+        "run": str(run.root),
+        "target": target.id,
+        "engine": target.engine,
+        "outcome": execution.outcome,
+        "expected": target.policy.expected,
+        "expectation_met": execution.expectation_met,
+    }
+    _print_result(
+        args.json,
+        summary,
+        f"run-target: {target.id} outcome={execution.outcome}; run={run.root}",
+    )
+    return 0 if execution.expectation_met else 1
+
+
+def _engine_doctor(args: argparse.Namespace) -> int:
+    result = doctor_engine(args.engine)
+    validate_instance(result, "engine-doctor.schema.json")
+    _print_result(
+        args.json,
+        result,
+        f"engine doctor: {args.engine} {result['status']}",
+    )
+    return 0 if result["status"] == "available" else 1
+
+
+def _run_profile(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    targets = load_target_registry(registry, args.target_root)
+    profiles = load_profile_registry(args.profile_config)
+    profile = profiles.require(args.profile)
+    selected = [targets.require(target_id) for target_id in profile.targets]
+    work_root = _work_root(args.work_root)
+    run = RunContext.start(
+        work_root=work_root,
+        command="run-profile",
+        source_root=args.asterinas,
+        registry=registry,
+        parameters={
+            "profile": profile.id,
+            "profile_config_sha256": profiles.config_sha256,
+            "target_registry_hash": targets.config_hash,
+            "changed_from": args.changed_from,
+            "baseline": _optional_path(args.baseline),
+        },
+    )
+    try:
+        ensure_asterinas_checkout(args.asterinas)
+        all_issues = validate_targets_against_checkout(targets, args.asterinas)
+        command_context = ProfileCommandContext(
+            source_root=args.asterinas.resolve(),
+            registry=registry,
+            run=run,
+            changed_from=args.changed_from,
+            baseline=args.baseline,
+        )
+        command_results = [
+            execute_profile_command(command, command_context)
+            for command in profile.commands
+        ]
+        command_failed = any(item["outcome"] != "pass" for item in command_results)
+        target_results: list[dict[str, Any]] = []
+        for target in selected:
+            if profile.fail_fast and command_failed:
+                break
+            issues = [issue for issue in all_issues if issue.target == target.id]
+            if issues:
+                detail = "; ".join(issue.detail for issue in issues)
+                raise ValueError(
+                    f"verification target {target.id} is not executable: {detail}"
+                )
+            execution = execute_target(
+                target,
+                EngineContext(
+                    source_root=args.asterinas.resolve(),
+                    work_root=work_root,
+                    run=run,
+                ),
+            )
+            target_results.append(
+                {
+                    "target": target.id,
+                    "engine": target.engine,
+                    "result_id": execution.result["result_id"],
+                    "outcome": execution.outcome,
+                    "expected": target.policy.expected,
+                    "expectation_met": execution.expectation_met,
+                }
+            )
+            if profile.fail_fast and not execution.expectation_met:
+                break
+        passed = all(item["outcome"] == "pass" for item in command_results) and all(
+            item["expectation_met"] for item in target_results
+        )
+        result = {
+            "schema_version": 1,
+            "profile": profile.id,
+            "status": "pass" if passed else "fail",
+            "profile_config_sha256": profiles.config_sha256,
+            "target_registry_hash": targets.config_hash,
+            "command_results": command_results,
+            "target_results": target_results,
+            "external_required": list(profile.external_required),
+        }
+        run.write_json(
+            "profile/result.json", result, schema="profile-result.schema.json"
+        )
+        run.complete()
+    except BaseException as error:
+        run.fail(error)
+        raise
+    summary = {"run": str(run.root), **result}
+    _print_result(
+        args.json,
+        summary,
+        f"run profile: {profile.id} status={result['status']}; run={run.root}",
+    )
+    return 0 if result["status"] == "pass" else 1
 
 
 def _verify_handoff(args: argparse.Namespace) -> int:

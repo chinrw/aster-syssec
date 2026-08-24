@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/kani-result.schema.json",
+  "title": "aster-syssec Kani engine result",
+  "allOf": [
+    { "$ref": "https://asterinas.dev/syssec/engine-result.schema.json" },
+    {
+      "properties": {
+        "engine": { "const": "kani" },
+        "engine_details": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["checks", "completeness", "counterexample"],
+          "properties": {
+            "checks": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["successful", "failures", "total", "failed_checks"],
+              "properties": {
+                "successful": { "type": ["integer", "null"], "minimum": 0 },
+                "failures": { "type": ["integer", "null"], "minimum": 0 },
+                "total": { "type": ["integer", "null"], "minimum": 0 },
+                "failed_checks": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "completeness": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["unwind", "unwind_sufficient", "assumptions"],
+              "properties": {
+                "unwind": { "type": ["integer", "null"], "minimum": 1 },
+                "unwind_sufficient": { "type": ["boolean", "null"] },
+                "assumptions": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "counterexample": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["present", "artifact", "concrete_playback_artifact"],
+              "properties": {
+                "present": { "type": "boolean" },
+                "artifact": { "type": ["string", "null"] },
+                "concrete_playback_artifact": { "type": ["string", "null"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

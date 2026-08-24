@@ -1,0 +1,30 @@
+version = 1
+id = "user-iovec-loongarch64"
+engine = "layout"
+track = "abi-integer-layout"
+properties = ["NO-UNINITIALIZED-COPYOUT", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+manifest_path = "kernel/libs/aster-uapi/Cargo.toml"
+target_triple = "loongarch64-unknown-none-softfloat"
+feature = "syssec-layout"
+record = "UserIoVec"
+section = ".syssec.layout"
+endianness = "little"
+source_symbols = ["UserIoVec", "USER_IOVEC_LAYOUT"]
+
+[expected_layout]
+pointer_width = 64
+size = 16
+alignment = 8
+
+[expected_layout.field_offsets]
+base = 0
+len = 8
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+
+[policy]
+expected = "pass"
+pr_blocking = true

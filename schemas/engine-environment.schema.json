@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/engine-environment.schema.json",
+  "title": "aster-syssec isolated engine environment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["variables", "writable_roots"],
+  "properties": {
+    "variables": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "writable_roots": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

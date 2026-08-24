@@ -1,0 +1,20 @@
+version = 1
+id = "iovec-host-fuzz"
+engine = "fuzz"
+track = "user-memory-partial-io"
+properties = ["BOUNDARY-VALIDATION", "PARTIAL-PROGRESS-CONSISTENCY"]
+package = "aster-uapi-fuzz"
+manifest_path = "kernel/libs/aster-uapi/fuzz/Cargo.toml"
+fuzz_target = "fuzz_iovec"
+runs = 1000
+max_input_size = 32
+sanitizer = "none"
+source_symbols = ["UserIoVec", "truncate_iovec_len", "iovec_entry_addr"]
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+
+[policy]
+expected = "pass"
+pr_blocking = true

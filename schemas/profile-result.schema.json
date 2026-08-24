@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/profile-result.schema.json",
+  "title": "aster-syssec profile orchestration result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile",
+    "status",
+    "profile_config_sha256",
+    "target_registry_hash",
+    "command_results",
+    "target_results",
+    "external_required"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "profile": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pass", "fail"] },
+    "profile_config_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "target_registry_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "command_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "outcome"],
+        "properties": {
+          "command": { "type": "string", "minLength": 1 },
+          "outcome": { "enum": ["pass", "fail", "unsupported"] }
+        }
+      }
+    },
+    "target_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "engine",
+          "result_id",
+          "outcome",
+          "expected",
+          "expectation_met"
+        ],
+        "properties": {
+          "target": { "type": "string", "minLength": 1 },
+          "engine": { "type": "string", "minLength": 1 },
+          "result_id": { "type": "string", "pattern": "^RESULT-[0-9A-F]{16}$" },
+          "outcome": { "type": "string", "minLength": 1 },
+          "expected": { "type": "string", "minLength": 1 },
+          "expectation_met": { "type": "boolean" }
+        }
+      }
+    },
+    "external_required": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

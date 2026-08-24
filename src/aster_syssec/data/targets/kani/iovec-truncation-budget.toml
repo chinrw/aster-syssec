@@ -1,0 +1,17 @@
+version = 1
+id = "iovec-truncation-budget"
+engine = "kani"
+track = "user-memory-partial-io"
+properties = ["PARTIAL-PROGRESS-CONSISTENCY", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+harness = "proof_iovec_truncation_preserves_the_remaining_budget"
+source_symbols = ["truncate_iovec_len"]
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+unwind = 8
+
+[policy]
+expected = "pass"
+pr_blocking = true

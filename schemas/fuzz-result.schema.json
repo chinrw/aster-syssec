@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/fuzz-result.schema.json",
+  "title": "aster-syssec host fuzz result",
+  "allOf": [
+    { "$ref": "https://asterinas.dev/syssec/engine-result.schema.json" },
+    {
+      "properties": {
+        "engine": { "const": "fuzz" },
+        "engine_details": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fuzz_target",
+            "configured_runs",
+            "completed_runs",
+            "max_input_size",
+            "sanitizer",
+            "seed_count",
+            "corpus_count",
+            "crash_inputs"
+          ],
+          "properties": {
+            "fuzz_target": { "type": "string", "minLength": 1 },
+            "configured_runs": { "type": "integer", "minimum": 1 },
+            "completed_runs": { "type": ["integer", "null"], "minimum": 0 },
+            "max_input_size": { "type": "integer", "minimum": 1 },
+            "sanitizer": { "type": "string", "minLength": 1 },
+            "seed_count": { "type": "integer", "minimum": 0 },
+            "corpus_count": { "type": "integer", "minimum": 0 },
+            "crash_inputs": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

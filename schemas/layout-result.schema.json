@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/layout-result.schema.json",
+  "title": "aster-syssec target layout result",
+  "allOf": [
+    { "$ref": "https://asterinas.dev/syssec/engine-result.schema.json" },
+    {
+      "properties": {
+        "engine": { "const": "layout" },
+        "engine_details": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "target_triple",
+            "endianness",
+            "record",
+            "section",
+            "layout",
+            "expected_layout",
+            "matches_expected"
+          ],
+          "properties": {
+            "target_triple": { "type": "string", "minLength": 1 },
+            "endianness": { "enum": ["little", "big"] },
+            "record": { "type": "string", "minLength": 1 },
+            "section": { "type": "string", "minLength": 1 },
+            "layout": {
+              "anyOf": [
+                { "$ref": "#/$defs/layout" },
+                { "type": "null" }
+              ]
+            },
+            "expected_layout": { "$ref": "#/$defs/layout" },
+            "matches_expected": { "type": ["boolean", "null"] }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pointer_width", "size", "alignment", "field_offsets"],
+      "properties": {
+        "pointer_width": { "type": "integer", "minimum": 8 },
+        "size": { "type": "integer", "minimum": 0 },
+        "alignment": { "type": "integer", "minimum": 1 },
+        "field_offsets": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

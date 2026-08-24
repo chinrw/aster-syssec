@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/engine-result.schema.json",
+  "title": "aster-syssec normalized engine result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result_id",
+    "plan_id",
+    "target",
+    "engine",
+    "track",
+    "properties",
+    "source_symbols",
+    "outcome",
+    "expected",
+    "expectation_met",
+    "started_at",
+    "finished_at",
+    "duration_ms",
+    "process",
+    "tool",
+    "artifacts",
+    "diagnostics",
+    "engine_details"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "result_id": { "type": "string", "pattern": "^RESULT-[0-9A-F]{16}$" },
+    "plan_id": { "type": "string", "pattern": "^PLAN-[0-9A-F]{16}$" },
+    "target": { "type": "string", "minLength": 1 },
+    "engine": { "type": "string", "minLength": 1 },
+    "track": { "type": "string", "minLength": 1 },
+    "properties": { "type": "array", "items": { "type": "string" } },
+    "source_symbols": { "type": "array", "items": { "type": "string" } },
+    "outcome": {
+      "enum": [
+        "pass",
+        "counterexample",
+        "mismatch",
+        "incomplete",
+        "unsupported",
+        "timeout",
+        "crash",
+        "hang",
+        "compile-error",
+        "tool-error"
+      ]
+    },
+    "expected": { "type": "string", "minLength": 1 },
+    "expectation_met": { "type": "boolean" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exit_code", "signal", "timed_out"],
+      "properties": {
+        "exit_code": { "type": ["integer", "null"] },
+        "signal": { "type": ["integer", "null"], "minimum": 1 },
+        "timed_out": { "type": "boolean" }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "null"] }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "null"] }
+    },
+    "diagnostics": { "type": "array", "items": { "type": "string" } },
+    "engine_details": { "type": "object" }
+  }
+}

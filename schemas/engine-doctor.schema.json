@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/engine-doctor.schema.json",
+  "title": "aster-syssec engine availability result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["engine", "adapter", "status", "executable", "version"],
+  "properties": {
+    "engine": { "type": "string", "minLength": 1 },
+    "adapter": { "enum": ["implemented", "not-implemented"] },
+    "status": { "enum": ["available", "unavailable"] },
+    "executable": { "type": ["string", "null"] },
+    "version": { "type": ["string", "null"] }
+  }
+}

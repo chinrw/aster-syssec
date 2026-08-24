@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/target-check.schema.json",
+  "title": "aster-syssec verification target checkout validation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "target_registry_hash", "targets", "issues"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "status": { "enum": ["ok", "fail"] },
+    "target_registry_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "targets": { "type": "integer", "minimum": 0 },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "target", "status", "detail"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "target": { "type": "string", "minLength": 1 },
+          "status": { "const": "FAIL" },
+          "detail": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

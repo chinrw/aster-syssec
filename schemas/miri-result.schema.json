@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/miri-result.schema.json",
+  "title": "aster-syssec Miri engine result",
+  "allOf": [
+    { "$ref": "https://asterinas.dev/syssec/engine-result.schema.json" },
+    {
+      "properties": {
+        "engine": { "const": "miri" },
+        "engine_details": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target_triple", "tests", "violation"],
+          "properties": {
+            "target_triple": { "type": "string", "minLength": 1 },
+            "tests": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["passed", "failed", "filtered_out"],
+              "properties": {
+                "passed": { "type": ["integer", "null"], "minimum": 0 },
+                "failed": { "type": ["integer", "null"], "minimum": 0 },
+                "filtered_out": { "type": ["integer", "null"], "minimum": 0 }
+              }
+            },
+            "violation": { "type": ["string", "null"] }
+          }
+        }
+      }
+    }
+  ]
+}

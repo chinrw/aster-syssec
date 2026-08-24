@@ -1,0 +1,20 @@
+version = 1
+id = "fd-reservation-visibility"
+engine = "loom"
+track = "fd-object-lifetime"
+properties = ["OBJECT-IDENTITY-STABILITY", "FAILURE-ATOMICITY"]
+package = "aster-fd-protocol"
+test = "reserved_slot_cannot_be_closed_or_reused_before_install"
+target_triple = "x86_64-unknown-linux-gnu"
+max_branches = 1000
+max_preemptions = 3
+max_permutations = 10000
+source_symbols = ["FdSlot"]
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+
+[policy]
+expected = "pass"
+pr_blocking = true

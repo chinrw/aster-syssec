@@ -2,10 +2,10 @@
 
 `aster-syssec` is an evidence-first syscall security reviewer for Asterinas.
 It reads an Asterinas checkout without modifying it and provides one CLI seam
-for inventory, deterministic candidate review, Asterinas's own agent reviewer,
-and gated Specula preparation.
+for inventory, deterministic candidate review, host verification engines,
+Asterinas's own agent reviewer, and gated Specula preparation.
 
-Version 0.2 implements:
+Version 0.3 implements:
 
 - three-architecture syscall dispatch inventory;
 - handler signature, SCML, regression-source, and track reconciliation;
@@ -17,12 +17,22 @@ Version 0.2 implements:
 - read-only adapters for Asterinas `aster-code-review` and Specula;
 - preflight-checked handoffs with exact source identities;
 - history-preserving exact-HEAD export for linked worktrees;
-- pinned GitHub Actions validation against the locked Asterinas source.
+- pinned GitHub Actions validation against the locked Asterinas source;
+- schema-validated verification targets and checkout preflight;
+- isolated Kani, Miri, cross-target layout, cargo-fuzz, and Loom adapters;
+- normalized engine plans, commands, environments, results, and raw logs;
+- bounded CI profile orchestration with per-command and per-target policy.
 
-It does not implement Kani, Miri, cargo-fuzz, Loom, differential VM execution,
-fault injection, or kernel fuzzing. `doctor` reports those engines as
-unverified, missing, or not implemented. Their names in a track describe the
-intended verification matrix, not a completed run.
+The bundled vertical slice contains five Kani proofs, one Miri test, three
+bare-metal layout targets, one cargo-fuzz target, and one Loom model. These
+targets require their matching production helper packages in the Asterinas
+checkout; `targets check` fails before execution when the package, symbol,
+harness, test, or fuzz target is absent.
+
+Version 0.3 does not implement differential VM execution, fault injection,
+kernel sequence fuzzing, Specula phase gates, or finding promotion. Engine
+results remain candidates and cannot become confirmed findings through the
+current CLI.
 
 ## Install
 
@@ -99,6 +109,11 @@ syssec review \
   --asterinas "$ASTERINAS_REPO" \
   --work-root "$SYSSEC_WORK_ROOT" \
   --track socket-cmsg-iovec
+
+syssec targets list
+syssec targets check \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT"
 ```
 
 The checkout and work root must not contain each other. Every
@@ -120,6 +135,62 @@ media type, schema identity, schema hash, and integrity status. The manifest
 also records the reviewer Git/content identity, rule hash, schema-set hash, and
 `flake.lock` hash. `report` verifies these records before reading artifacts and
 counts repeated candidate IDs once while retaining an occurrence count.
+
+## Host verification
+
+Inspect engine availability, validate a target against production source, then
+run it:
+
+```sh
+syssec engine doctor --engine kani
+
+syssec targets check \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT"
+
+syssec run-target \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --target iovec-entry-address-no-wrap
+```
+
+`run-target` fixes all writable build and temporary paths below the run or
+work root. Kani concrete playback is printed into evidence and never applied
+in place. The layout adapter cross-compiles the production crate and reads a
+dedicated object section; it does not infer bare-metal layout from the host.
+The fuzz adapter uses a run-local shadow project and verifies that the source
+lock file did not change. Loom bounds are part of both the target and result.
+
+Each run registers:
+
+```text
+engine/
+├── plan.json
+├── command.json
+├── environment.json
+├── stdout.log
+├── stderr.log
+└── result.json
+```
+
+Outcomes use one vocabulary: `pass`, `counterexample`, `mismatch`,
+`incomplete`, `unsupported`, `timeout`, `crash`, `hang`, `compile-error`, and
+`tool-error`. Incomplete unwind, unsupported Miri operations, and tool failures
+are never normalized to `pass`.
+
+Profiles execute implemented reviewer commands and declared verification
+targets through the same run lifecycle:
+
+```sh
+syssec run \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --profile pr \
+  --changed-from origin/main
+```
+
+`external_required` entries remain explicit gaps in `profile/result.json`; the
+orchestrator does not report them as executed.
 
 ## Inventory
 

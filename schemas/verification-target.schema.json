@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/verification-target.schema.json",
+  "title": "aster-syssec verification target",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "id",
+    "engine",
+    "track",
+    "properties",
+    "source_symbols",
+    "limits",
+    "policy"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "engine": {
+      "enum": [
+        "differential",
+        "fuzz",
+        "kani",
+        "kernel-fuzz",
+        "layout",
+        "loom",
+        "miri",
+        "runtime",
+        "specula"
+      ]
+    },
+    "track": { "type": "string", "minLength": 1 },
+    "properties": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "package": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+    "harness": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+    "manifest_path": { "type": "string", "minLength": 1 },
+    "test": { "type": "string", "minLength": 1 },
+    "target_triple": { "type": "string", "minLength": 1 },
+    "case_id": { "type": "string", "minLength": 1 },
+    "feature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "record": { "type": "string", "minLength": 1 },
+    "section": { "type": "string", "pattern": "^\\.[A-Za-z0-9._-]+$" },
+    "endianness": { "enum": ["little", "big"] },
+    "expected_layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pointer_width", "size", "alignment", "field_offsets"],
+      "properties": {
+        "pointer_width": { "type": "integer", "minimum": 8 },
+        "size": { "type": "integer", "minimum": 0 },
+        "alignment": { "type": "integer", "minimum": 1 },
+        "field_offsets": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "fuzz_target": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "runs": { "type": "integer", "minimum": 1 },
+    "max_input_size": { "type": "integer", "minimum": 1 },
+    "sanitizer": {
+      "enum": ["address", "leak", "memory", "thread", "none"]
+    },
+    "max_branches": { "type": "integer", "minimum": 1 },
+    "max_preemptions": { "type": "integer", "minimum": 0 },
+    "max_permutations": { "type": "integer", "minimum": 1 },
+    "source_symbols": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeout_seconds", "memory_bytes"],
+      "properties": {
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "memory_bytes": { "type": "integer", "minimum": 1048576 },
+        "unwind": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["expected", "pr_blocking"],
+      "properties": {
+        "expected": {
+          "enum": [
+            "pass",
+            "counterexample",
+            "mismatch",
+            "incomplete",
+            "unsupported",
+            "timeout",
+            "crash",
+            "hang",
+            "compile-error",
+            "tool-error"
+          ]
+        },
+        "pr_blocking": { "type": "boolean" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "engine": { "const": "kani" } } },
+      "then": { "required": ["package", "harness"] }
+    },
+    {
+      "if": { "properties": { "engine": { "const": "miri" } } },
+      "then": { "required": ["package", "test", "target_triple"] }
+    },
+    {
+      "if": { "properties": { "engine": { "const": "layout" } } },
+      "then": {
+        "required": [
+          "package",
+          "manifest_path",
+          "target_triple",
+          "feature",
+          "record",
+          "section",
+          "endianness",
+          "expected_layout"
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "engine": { "const": "fuzz" } } },
+      "then": {
+        "required": [
+          "package",
+          "manifest_path",
+          "fuzz_target",
+          "runs",
+          "max_input_size",
+          "sanitizer"
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "engine": { "const": "loom" } } },
+      "then": {
+        "required": [
+          "package",
+          "test",
+          "target_triple",
+          "max_branches",
+          "max_preemptions"
+        ]
+      }
+    }
+  ]
+}

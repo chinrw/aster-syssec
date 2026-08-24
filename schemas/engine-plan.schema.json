@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/engine-plan.schema.json",
+  "title": "aster-syssec engine execution plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "created_at",
+    "target",
+    "target_config_sha256",
+    "engine",
+    "track",
+    "properties",
+    "source_symbols",
+    "source",
+    "command",
+    "environment",
+    "limits",
+    "expected"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "plan_id": { "type": "string", "pattern": "^PLAN-[0-9A-F]{16}$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "target": { "type": "string", "minLength": 1 },
+    "target_config_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "engine": { "type": "string", "minLength": 1 },
+    "track": { "type": "string", "minLength": 1 },
+    "properties": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "source_symbols": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "revision", "dirty_hash"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "revision": { "type": ["string", "null"] },
+        "dirty_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "command": { "$ref": "https://asterinas.dev/syssec/engine-command.schema.json" },
+    "environment": { "$ref": "https://asterinas.dev/syssec/engine-environment.schema.json" },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeout_seconds", "memory_bytes", "unwind"],
+      "properties": {
+        "timeout_seconds": { "type": "integer", "minimum": 1 },
+        "memory_bytes": { "type": "integer", "minimum": 1048576 },
+        "unwind": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "expected": { "type": "string", "minLength": 1 }
+  }
+}

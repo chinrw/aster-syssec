@@ -1,0 +1,17 @@
+version = 1
+id = "iovec-entry-address-no-wrap"
+engine = "kani"
+track = "user-memory-partial-io"
+properties = ["BOUNDARY-VALIDATION", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+harness = "proof_iovec_entry_address_no_wrap"
+source_symbols = ["iovec_entry_addr"]
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+unwind = 8
+
+[policy]
+expected = "pass"
+pr_blocking = true

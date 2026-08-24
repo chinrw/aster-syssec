@@ -1,0 +1,17 @@
+version = 1
+id = "iovec-nonnegative-length"
+engine = "kani"
+track = "user-memory-partial-io"
+properties = ["BOUNDARY-VALIDATION", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+harness = "proof_nonnegative_iovec_length_preserves_value"
+source_symbols = ["UserIoVec"]
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+unwind = 8
+
+[policy]
+expected = "pass"
+pr_blocking = true

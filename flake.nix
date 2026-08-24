@@ -135,7 +135,7 @@
 
           syssec = python.pkgs.buildPythonApplication {
             pname = "aster-syssec";
-            version = "0.2.0";
+            version = "0.3.0";
             pyproject = true;
             src = projectSource;
 
@@ -148,6 +148,10 @@
               "--set"
               "SYSSEC_BUILD_REVISION"
               (self.rev or self.dirtyRev or "unknown")
+              "--prefix"
+              "PATH"
+              ":"
+              (lib.makeBinPath [ pkgs.util-linux ])
             ];
             nativeCheckInputs = [
               pkgs.actionlint
@@ -157,6 +161,7 @@
               pkgs.pyright
               pkgs.ruff
               pkgs.shellcheck
+              pkgs.util-linux
               python.pkgs.jsonschema
               python.pkgs.referencing
             ];
@@ -229,8 +234,9 @@
             ];
             text = ''
               cache_root="''${XDG_CACHE_HOME:-$HOME/.cache}/aster-syssec"
-              export KANI_HOME="''${KANI_HOME:-$cache_root/kani}"
-              export RUSTUP_HOME="''${SYSSEC_KANI_RUSTUP_HOME:-$cache_root/kani-rustup}"
+              work_root="''${SYSSEC_WORK_ROOT:-$cache_root/work}"
+              export KANI_HOME="''${KANI_HOME:-$work_root/cache/kani}"
+              export RUSTUP_HOME="''${SYSSEC_KANI_RUSTUP_HOME:-$work_root/cache/kani-rustup}"
               mkdir -p "$KANI_HOME"
               mkdir -p "$RUSTUP_HOME"
               exec cargo-kani setup "$@"
@@ -249,6 +255,7 @@
             ripgrep
             ruff
             shellcheck
+            util-linux
             uv
           ];
 
@@ -289,8 +296,8 @@
           formalShellHook = commonShellHook + ''
             export ASTERINAS_RUST_TOOLCHAIN=${lib.escapeShellArg rustSpec.channel}
             export KANI_VERSION=${lib.escapeShellArg versions.kani}
-            export KANI_HOME="''${KANI_HOME:-$cache_root/kani}"
-            export RUSTUP_HOME="''${SYSSEC_KANI_RUSTUP_HOME:-$cache_root/kani-rustup}"
+            export KANI_HOME="''${KANI_HOME:-$SYSSEC_WORK_ROOT/cache/kani}"
+            export RUSTUP_HOME="''${SYSSEC_KANI_RUSTUP_HOME:-$SYSSEC_WORK_ROOT/cache/kani-rustup}"
             export JAVA_HOME=${pkgs.jdk21_headless}
           '';
 
