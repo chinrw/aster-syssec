@@ -12,7 +12,7 @@
     # The lock records the Asterinas revision whose rust-toolchain.toml defines
     # the default formal shell. Override this input to use another checkout.
     asterinas-src = {
-      url = "github:asterinas/asterinas/604948581512d83734377974d4c34adb4530f2d7";
+      url = "github:chinrw/asterinas/490960ace3e15bf74146e406ec11a9425755cfba";
       flake = false;
     };
 

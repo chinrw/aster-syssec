@@ -13,8 +13,38 @@ from unittest.mock import patch
 from aster_syssec.cli import main
 from aster_syssec.config import load_registry
 from aster_syssec.inventory import InventoryBuilder
+from aster_syssec.profiles import load_profile_registry
 from aster_syssec.targets import load_target_registry
 from tests.helpers import init_git_repository, write_fixture
+
+
+class PackagedProfileTests(unittest.TestCase):
+    def test_pr_profile_runs_the_bounded_host_verification_set(self) -> None:
+        profile = load_profile_registry().require("pr")
+
+        self.assertEqual(
+            profile.targets,
+            (
+                "iovec-negative-length",
+                "iovec-nonnegative-length",
+                "iovec-entry-address-no-wrap",
+                "iovec-supported-index-offset",
+                "iovec-truncation-budget",
+                "user-iovec-layout",
+                "user-iovec-x86-64",
+                "fd-reservation-visibility",
+            ),
+        )
+
+    def test_nightly_profile_runs_all_packaged_targets(self) -> None:
+        profiles = load_profile_registry()
+        nightly = profiles.require("nightly")
+        targets = load_target_registry(load_registry()).targets
+
+        self.assertEqual(set(nightly.targets), set(targets))
+        self.assertNotIn("full Kani", nightly.external_required)
+        self.assertNotIn("Miri host tests", nightly.external_required)
+        self.assertNotIn("Loom models", nightly.external_required)
 
 
 def write_kani_target(root: Path) -> Path:

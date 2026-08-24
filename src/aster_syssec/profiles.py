@@ -66,10 +66,10 @@ def load_profile_registry(path: Path | None = None) -> ProfileRegistry:
             )
         profiles[profile_id] = VerificationProfile(
             id=profile_id,
-            commands=_string_tuple(item.get("implemented_commands", ()), profile_id),
-            targets=_string_tuple(item.get("targets", ()), profile_id),
+            commands=_string_tuple(item.get("implemented_commands", []), profile_id),
+            targets=_string_tuple(item.get("targets", []), profile_id),
             external_required=_string_tuple(
-                item.get("external_required", ()), profile_id
+                item.get("external_required", []), profile_id
             ),
             fail_fast=bool(item.get("fail_fast", True)),
         )
