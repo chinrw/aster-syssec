@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-08-24T07:56:18Z",
+  "asterinas_revision": "490960ace3e15bf74146e406ec11a9425755cfba",
+  "profile": "nightly",
+  "profile_config_sha256": "c85b94a4465fc994f65ce0b4656e640ca07f7727305534500a85c68b272da14e",
+  "target_registry_sha256": "ad6f0e903e9ca7e292a81bc895fb717eed9ef56ccf035871aa66bb695e590e11",
+  "status": "pass",
+  "targets": [
+    {
+      "id": "iovec-negative-length",
+      "engine": "kani",
+      "outcome": "pass"
+    },
+    {
+      "id": "iovec-nonnegative-length",
+      "engine": "kani",
+      "outcome": "pass"
+    },
+    {
+      "id": "iovec-entry-address-no-wrap",
+      "engine": "kani",
+      "outcome": "pass"
+    },
+    {
+      "id": "iovec-supported-index-offset",
+      "engine": "kani",
+      "outcome": "pass"
+    },
+    {
+      "id": "iovec-truncation-budget",
+      "engine": "kani",
+      "outcome": "pass"
+    },
+    {
+      "id": "user-iovec-layout",
+      "engine": "miri",
+      "outcome": "pass"
+    },
+    {
+      "id": "user-iovec-x86-64",
+      "engine": "layout",
+      "outcome": "pass"
+    },
+    {
+      "id": "user-iovec-riscv64",
+      "engine": "layout",
+      "outcome": "pass"
+    },
+    {
+      "id": "user-iovec-loongarch64",
+      "engine": "layout",
+      "outcome": "pass"
+    },
+    {
+      "id": "iovec-host-fuzz",
+      "engine": "fuzz",
+      "outcome": "pass",
+      "runs": 1000
+    },
+    {
+      "id": "fd-reservation-visibility",
+      "engine": "loom",
+      "outcome": "pass",
+      "max_branches": 1000,
+      "max_preemptions": 3,
+      "max_permutations": 10000
+    }
+  ]
+}

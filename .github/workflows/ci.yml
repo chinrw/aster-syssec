@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: "23 17 * * *"
 
 permissions:
   contents: read
@@ -39,5 +41,54 @@ jobs:
         with:
           name: aster-syssec-evidence
           path: ${{ runner.temp }}/aster-syssec
+          if-no-files-found: warn
+          retention-days: 14
+
+  host-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out pinned Asterinas
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: chinrw/asterinas
+          ref: 490960ace3e15bf74146e406ec11a9425755cfba
+          path: asterinas
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+      - name: Install the pinned Kani bundle
+        env:
+          SYSSEC_WORK_ROOT: ${{ runner.temp }}/aster-syssec-host
+        run: nix develop .#formal --command syssec-kani-setup
+
+      - name: Run the host-verification profile
+        env:
+          SYSSEC_PROFILE: ${{ github.event_name == 'schedule' && 'nightly' || 'pr' }}
+          SYSSEC_WORK_ROOT: ${{ runner.temp }}/aster-syssec-host
+        run: |
+          args=()
+          if [[ "$SYSSEC_PROFILE" == pr ]]; then
+            args+=(--changed-from HEAD)
+          fi
+          nix develop .#formal --command syssec run \
+            --asterinas "$GITHUB_WORKSPACE/asterinas" \
+            --work-root "$SYSSEC_WORK_ROOT" \
+            --profile "$SYSSEC_PROFILE" \
+            "${args[@]}"
+
+      - name: Upload host-verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aster-syssec-host-evidence
+          path: ${{ runner.temp }}/aster-syssec-host
           if-no-files-found: warn
           retention-days: 14

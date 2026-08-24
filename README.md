@@ -48,7 +48,7 @@ nix develop .#kernel-fuzz   # formal shell plus Go/QEMU/syzkaller
 ```
 
 The default flake input reads the Rust channel, components, and targets from
-Asterinas revision `604948581512d83734377974d4c34adb4530f2d7`. Override it
+Asterinas revision `490960ace3e15bf74146e406ec11a9425755cfba`. Override it
 when reviewing another checkout:
 
 ```sh

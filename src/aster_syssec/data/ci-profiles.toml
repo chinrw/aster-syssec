@@ -2,6 +2,16 @@ version = 1
 
 [profiles.pr]
 implemented_commands = ["config-check", "inventory --check", "review --changed-from"]
+targets = [
+  "iovec-negative-length",
+  "iovec-nonnegative-length",
+  "iovec-entry-address-no-wrap",
+  "iovec-supported-index-offset",
+  "iovec-truncation-budget",
+  "user-iovec-layout",
+  "user-iovec-x86-64",
+  "fd-reservation-visibility",
+]
 blocking = [
   "structural catalog drift",
   "baseline dispatch or coverage regression",
@@ -11,9 +21,21 @@ external_required = ["make check", "targeted regression", "known reproducer repl
 
 [profiles.nightly]
 implemented_commands = ["inventory --check", "review"]
+targets = [
+  "iovec-negative-length",
+  "iovec-nonnegative-length",
+  "iovec-entry-address-no-wrap",
+  "iovec-supported-index-offset",
+  "iovec-truncation-budget",
+  "user-iovec-layout",
+  "user-iovec-x86-64",
+  "user-iovec-riscv64",
+  "user-iovec-loongarch64",
+  "iovec-host-fuzz",
+  "fd-reservation-visibility",
+]
 external_required = [
-  "full Kani", "Miri host tests", "Loom models", "SMP regression",
-  "LTP", "kselftest", "gVisor", "differential corpus",
+  "SMP regression", "LTP", "kselftest", "gVisor", "differential corpus",
 ]
 
 [profiles.weekly]
