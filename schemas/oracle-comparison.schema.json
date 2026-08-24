@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/oracle-comparison.schema.json",
+  "title": "aster-syssec runtime oracle comparison",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "comparison_id",
+    "compared_at",
+    "target",
+    "case_id",
+    "comparator",
+    "binary_sha256",
+    "asterinas_result",
+    "linux_result",
+    "status",
+    "disposition",
+    "fields",
+    "diagnostics"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "comparison_id": {
+      "type": "string",
+      "pattern": "^ORACLE-COMPARISON-[0-9A-F]{16}$"
+    },
+    "compared_at": { "type": "string", "format": "date-time" },
+    "target": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "case_id": { "type": "string", "minLength": 1 },
+    "comparator": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*-v[1-9][0-9]*$"
+    },
+    "binary_sha256": { "$ref": "#/$defs/sha256" },
+    "asterinas_result": { "$ref": "#/$defs/result_reference" },
+    "linux_result": { "$ref": "#/$defs/result_reference" },
+    "status": { "enum": ["match", "mismatch", "incomplete"] },
+    "disposition": { "enum": ["baseline", "candidate", "incomplete"] },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "relation",
+          "asterinas",
+          "linux",
+          "matched"
+        ],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "relation": { "const": "equal" },
+          "asterinas": { "$ref": "#/$defs/scalar" },
+          "linux": { "$ref": "#/$defs/scalar" },
+          "matched": { "type": "boolean" }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "match" } } },
+      "then": {
+        "properties": {
+          "disposition": { "const": "baseline" },
+          "fields": {
+            "items": {
+              "properties": { "matched": { "const": true } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "mismatch" } } },
+      "then": {
+        "properties": {
+          "disposition": { "const": "candidate" },
+          "fields": {
+            "contains": {
+              "required": ["matched"],
+              "properties": { "matched": { "const": false } }
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "incomplete" } } },
+      "then": {
+        "properties": { "disposition": { "const": "incomplete" } }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "result_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_id", "sha256"],
+      "properties": {
+        "result_id": {
+          "type": "string",
+          "pattern": "^RUNTIME-RESULT-[0-9A-F]{16}$"
+        },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "scalar": {
+      "type": ["string", "number", "boolean", "null"]
+    }
+  }
+}

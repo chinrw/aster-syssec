@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/runtime-request.schema.json",
+  "title": "aster-syssec runtime execution request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "created_at",
+    "target",
+    "target_config_sha256",
+    "platform",
+    "source",
+    "binary",
+    "oracle",
+    "evidence_root",
+    "execution",
+    "limits"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "request_id": {
+      "type": "string",
+      "pattern": "^RUNTIME-REQUEST-[0-9A-F]{16}$"
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "target": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "target_config_sha256": { "$ref": "#/$defs/sha256" },
+    "platform": { "enum": ["asterinas", "linux-oracle"] },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "revision", "dirty_hash"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 1 },
+        "dirty_hash": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "binary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "source_sha256",
+        "compiler",
+        "linker",
+        "build_command"
+      ],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "source_sha256": { "$ref": "#/$defs/sha256" },
+        "compiler": { "type": "string", "minLength": 1 },
+        "linker": { "type": "string", "minLength": 1 },
+        "build_command": {
+          "$ref": "https://asterinas.dev/syssec/engine-command.schema.json"
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "metadata_sha256"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "metadata_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "evidence_root": { "type": "string", "minLength": 1 },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "acceleration",
+        "host_forwarding",
+        "memory_bytes",
+        "smp"
+      ],
+      "properties": {
+        "acceleration": { "enum": ["tcg", "kvm"] },
+        "host_forwarding": { "const": false },
+        "memory_bytes": { "type": "integer", "minimum": 134217728 },
+        "smp": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boot_timeout_seconds",
+        "test_timeout_seconds",
+        "output_bytes"
+      ],
+      "properties": {
+        "boot_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "test_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "output_bytes": { "type": "integer", "minimum": 1024 }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/guest-result.schema.json",
+  "title": "aster-syssec guest result",
+  "type": "object",
+  "required": ["case_id", "exit_kind"],
+  "properties": {
+    "case_id": { "type": "string", "minLength": 1 },
+    "exit_kind": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": {
+    "type": ["string", "number", "boolean", "null"]
+  }
+}

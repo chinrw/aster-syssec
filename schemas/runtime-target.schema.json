@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/runtime-target.schema.json",
+  "title": "aster-syssec runtime verification target",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "track",
+    "case_id",
+    "guest_case",
+    "target_arch",
+    "properties",
+    "source_symbols",
+    "oracle",
+    "comparator",
+    "limits",
+    "expected"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "track": { "type": "string", "minLength": 1 },
+    "case_id": { "type": "string", "minLength": 1 },
+    "guest_case": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+    },
+    "target_arch": { "type": "string", "minLength": 1 },
+    "properties": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "source_symbols": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "oracle": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "comparator": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*-v[1-9][0-9]*$"
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boot_timeout_seconds",
+        "test_timeout_seconds",
+        "output_bytes",
+        "memory_bytes",
+        "smp"
+      ],
+      "properties": {
+        "boot_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "test_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "output_bytes": { "type": "integer", "minimum": 1024 },
+        "memory_bytes": { "type": "integer", "minimum": 134217728 },
+        "smp": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "expected": { "const": "match" }
+  }
+}
