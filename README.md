@@ -5,6 +5,11 @@ It reads an Asterinas checkout without modifying it and provides one CLI seam
 for inventory, deterministic candidate review, host verification engines,
 Asterinas's own agent reviewer, and gated Specula preparation.
 
+Agents continuing Host Verification, Runtime Foundation, syscall analysis, or
+Specula integration should start with the
+[current agent handoff](docs/agent-handoff.md). It separates merged, open-PR,
+executed, schema-only, and planned work.
+
 Version 0.3 implements:
 
 - three-architecture syscall dispatch inventory;
@@ -354,6 +359,7 @@ unexpected exception leaves the manifest marked `failed`.
 
 ## Contracts
 
+- [Current agent handoff](docs/agent-handoff.md)
 - [Reviewer contract](docs/reviewer-contract.md)
 - [Threat model](docs/threat-model.md)
 - [Static rules](docs/static-rules.md)
