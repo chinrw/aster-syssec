@@ -50,9 +50,11 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 | open PR #2 | `6e35d0016344832b54c07641a62f1ebde13ba56b` | Runtime schemas and strict guest parser |
 | open PR #3 | `c11f7530d4f6c6a7094041e19fd59e95592d9970` | Asterinas QEMU adapter, stacked on PR #2 |
 | open PR #4 | `b745a346933abc2d7867656b1e9ebe8b29b27d80` | Current agent handoff, stacked on PR #3 |
+| open PR #5 | `ac21746131b73f4f901155614d0e415f953770a2` | Static-binary export and provenance, stacked on PR #4 |
 
 PR #2, PR #3, and PR #4 had successful `validate` and `host-verification`
-checks at this snapshot. Integrate them in stack order. None was merged.
+checks at this snapshot. PR #5 checks were running. Integrate them in stack
+order. None was merged.
 
 The package version remains `0.3.0`. Runtime work has not changed the release
 tag.
@@ -74,7 +76,7 @@ The three persistent Asterinas seam PRs are merged in `chinrw/asterinas`:
 | #3 `syssec-fd-protocol` | `5eb921ef74cbd397118270c2e27b38bac4103ff8` | reserved FD protocol and Loom model |
 | #4 `syssec-runtime-harness` | `da81ae952e245b6bb60229457f090575c4fe97f6` | isolated guest case runner and partial-EFAULT case |
 
-Asterinas PR #5 adds target-specific static linking for
+`chinrw/asterinas` PR #5 adds target-specific static linking for
 `partial_efault_json`. Its signed head is
 `d0bddbf56d893221d103a0c3330f379dc59977b9`; the aster-syssec flake pins this
 revision so the exporter cannot silently consume the earlier dynamic binary.
@@ -430,7 +432,8 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Integrate PR #2, PR #3, and PR #4 without flattening their review boundaries.
+1. Integrate aster-syssec PR #2 through PR #5 without flattening their review
+   boundaries.
 2. Add pinned Linux oracle metadata and a Linux QEMU adapter using the exported
    binary without rebuilding it.
 3. Implement the partial-EFAULT field relation and comparison producer.
