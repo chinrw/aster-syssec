@@ -80,7 +80,7 @@ printf 'qemu stderr\n' >&2
     )
 
 
-def _write_oracle(root: Path, qemu: Path) -> Path:
+def _write_oracle(root: Path, qemu: Path, packer: Path) -> Path:
     oracle_root = root / "oracle"
     inputs = oracle_root / "inputs"
     inputs.mkdir(parents=True)
@@ -107,11 +107,17 @@ def _write_oracle(root: Path, qemu: Path) -> Path:
         "qemu": {
             "executable": str(qemu),
             "version": "QEMU emulator version 10.1.0",
+            "sha256": _sha256(qemu),
             "machine": "q35",
             "cpu": "max",
             "acceleration": "tcg",
             "memory_bytes": 128 * 1024 * 1024,
             "smp": 1,
+        },
+        "packer": {
+            "executable": str(packer),
+            "version": "syssec-initramfs-packer 1.0",
+            "sha256": _sha256(packer),
         },
     }
     metadata_path = oracle_root / "oracle-image.json"
@@ -182,7 +188,7 @@ class LinuxOracleAdapterTests(unittest.TestCase):
             binary.chmod(0o755)
             qemu = _write_normal_qemu(root / "qemu-system-x86_64")
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
             request = _runtime_request(
                 root,
@@ -251,7 +257,7 @@ exit 2
 """,
             )
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
 
             result = LinuxOracleAdapter(
@@ -287,7 +293,7 @@ exit 0
 """,
             )
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
 
             result = LinuxOracleAdapter(
@@ -323,7 +329,7 @@ sleep 5
 """,
             )
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
             request = _runtime_request(
                 root,
@@ -360,7 +366,7 @@ sleep 5
 """,
             )
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
 
             result = LinuxOracleAdapter(
@@ -397,7 +403,7 @@ sleep 5
 """,
             )
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
             request = _runtime_request(
                 root,
@@ -434,7 +440,7 @@ sleep 5
 """,
             )
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
             request = _runtime_request(
                 root,
@@ -470,7 +476,7 @@ printf 'SYSSEC_GUEST_READY\n'
 """,
             )
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
 
             result = LinuxOracleAdapter(
@@ -511,7 +517,7 @@ sleep 5
 """,
             )
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
             request = _runtime_request(
                 root,
@@ -543,6 +549,8 @@ sleep 5
             "kernel_config",
             "kernel_image",
             "rootfs",
+            "qemu",
+            "packer",
         ):
             with (
                 self.subTest(changed_input=changed_input),
@@ -554,7 +562,7 @@ sleep 5
                 binary.chmod(0o755)
                 qemu = _write_normal_qemu(root / "qemu-system-x86_64")
                 packer = _write_packer(root / "initramfs-packer")
-                metadata = _write_oracle(root, qemu)
+                metadata = _write_oracle(root, qemu, packer)
                 evidence_root = root / "evidence"
                 request = _runtime_request(
                     root,
@@ -569,6 +577,16 @@ sleep 5
                     )
                 elif changed_input == "binary":
                     binary.write_bytes(b"changed-static-binary\n")
+                elif changed_input == "qemu":
+                    qemu.write_text(
+                        qemu.read_text(encoding="utf-8") + "# changed\n",
+                        encoding="utf-8",
+                    )
+                elif changed_input == "packer":
+                    packer.write_text(
+                        packer.read_text(encoding="utf-8") + "# changed\n",
+                        encoding="utf-8",
+                    )
                 else:
                     metadata_value = json.loads(metadata.read_text(encoding="utf-8"))
                     Path(metadata_value[changed_input]["path"]).write_bytes(
@@ -591,7 +609,7 @@ sleep 5
             binary.chmod(0o755)
             qemu = _write_normal_qemu(root / "qemu-system-x86_64")
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = metadata.parent / "runtime-evidence"
             request = _runtime_request(
                 root,
@@ -616,7 +634,7 @@ sleep 5
             binary.chmod(0o755)
             qemu = _write_normal_qemu(root / "qemu-system-x86_64")
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             metadata_value = json.loads(metadata.read_text(encoding="utf-8"))
             metadata_value["qemu"]["version"] = "QEMU emulator version 9.2.0"
             metadata.write_text(
@@ -647,7 +665,7 @@ sleep 5
             binary.chmod(0o755)
             qemu = _write_normal_qemu(root / "qemu-system-x86_64")
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             metadata_value = json.loads(metadata.read_text(encoding="utf-8"))
             metadata_value["qemu"]["version"] = "10.1.0"
             metadata.write_text(
@@ -702,7 +720,7 @@ printf 'changed-by-packer\n' > "$4"
 printf 'derived-initramfs\n' > "$6"
 """,
             )
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
             request = _runtime_request(
                 root,
@@ -749,7 +767,7 @@ head -c 2048 /dev/zero | tr '\000' X >&2
 sleep 5
 """,
             )
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
             request = _runtime_request(
                 root,
@@ -799,7 +817,7 @@ fi
 ln -s '{outside}' "$6"
 """,
             )
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
 
             with self.assertRaisesRegex(ValueError, "regular file"):
@@ -852,7 +870,7 @@ fi
 printf 'derived-initramfs\n' > "$6"
 """,
             )
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
 
             result = LinuxOracleAdapter(
                 oracle_metadata_path=metadata,
@@ -921,7 +939,7 @@ time.sleep(5)
             )
             qemu.chmod(0o755)
             packer = _write_packer(root / "initramfs-packer")
-            metadata = _write_oracle(root, qemu)
+            metadata = _write_oracle(root, qemu, packer)
             evidence_root = root / "evidence"
 
             result = LinuxOracleAdapter(

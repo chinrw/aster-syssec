@@ -49,6 +49,10 @@
             pythonPackages.jsonschema
             pythonPackages.referencing
           ]);
+          linuxOracle = import ./nix/linux-oracle.nix {
+            inherit pkgs;
+            nixpkgsRevision = nixpkgs.rev;
+          };
 
           projectSource = lib.fileset.toSource {
             root = ./.;
@@ -156,7 +160,9 @@
             nativeCheckInputs = [
               pkgs.actionlint
               pkgs.check-jsonschema
+              pkgs.cpio
               pkgs.git
+              pkgs.gzip
               pkgs.jq
               pkgs.pyright
               pkgs.ruff
@@ -170,12 +176,14 @@
               runHook preCheck
               export PYTHONPATH="$PWD/src:${pythonEnv}/${python.sitePackages}"
               ${pythonEnv.interpreter} -m unittest discover -v
+              SYSSEC_INITRAMFS_PACKER=${linuxOracle.packer}/bin/syssec-initramfs-packer \
+                bash tests/test_linux_oracle_packer.sh
               ruff check src tests
               ruff format --check src tests
               pyright src tests
               check-jsonschema --check-metaschema schemas/*.json
               actionlint .github/workflows/*.yml
-              shellcheck scripts/*.sh
+              shellcheck scripts/*.sh tests/*.sh
               runHook postCheck
             '';
             pythonImportsCheck = [ "aster_syssec" ];
@@ -325,12 +333,15 @@
             inherit syssec;
             kani-installer = kaniInstaller;
             kani-setup = kaniSetup;
+            linux-oracle-bundle = linuxOracle.bundle;
+            linux-oracle-packer = linuxOracle.packer;
             inherit syzkaller;
           };
 
           checks = {
             package = syssec;
             kani-installer = kaniInstaller;
+            linux-oracle-bundle = linuxOracle.bundle;
             inherit syzkaller;
             toolchain-contract = pkgs.runCommand "aster-syssec-toolchain-contract" { } ''
               mkdir -p "$out"

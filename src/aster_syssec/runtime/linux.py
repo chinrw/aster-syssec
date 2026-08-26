@@ -70,6 +70,9 @@ class LinuxOracleAdapter:
         binary = Path(request_value["binary"]["path"]).resolve(strict=True)
         qemu = _resolve_executable(metadata["qemu"]["executable"])
         packer = _resolve_executable(self._initramfs_packer_executable)
+        pinned_packer = _resolve_executable(metadata["packer"]["executable"])
+        if packer != pinned_packer:
+            raise ValueError("initramfs packer does not match oracle metadata")
         inputs = (
             (kernel_config, metadata["kernel_config"]["sha256"], "kernel config"),
             (kernel_image, metadata["kernel_image"]["sha256"], "kernel image"),
@@ -88,6 +91,12 @@ class LinuxOracleAdapter:
         packer_version = _tool_version(packer, output_limit=output_limit)
         qemu_sha256 = _sha256_file(qemu)
         packer_sha256 = _sha256_file(packer)
+        if qemu_sha256 != metadata["qemu"]["sha256"]:
+            raise ValueError("QEMU hash does not match oracle metadata")
+        if packer_version != metadata["packer"]["version"]:
+            raise ValueError("initramfs packer version does not match oracle metadata")
+        if packer_sha256 != metadata["packer"]["sha256"]:
+            raise ValueError("initramfs packer hash does not match oracle metadata")
 
         evidence_root = Path(request_value["evidence_root"]).resolve()
         _require_disjoint_inputs(

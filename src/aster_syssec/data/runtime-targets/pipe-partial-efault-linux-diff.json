@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "pipe-partial-efault-linux-diff",
+  "track": "user-memory-partial-io",
+  "case_id": "pipe-partial-efault-read",
+  "guest_case": "io/file_io/partial_efault_json",
+  "target_arch": "x86_64",
+  "properties": [
+    "PARTIAL-PROGRESS-CONSISTENCY",
+    "LINUX-ABI-CONTRACT"
+  ],
+  "source_symbols": [
+    "SYS_read",
+    "readv"
+  ],
+  "oracle": "linux-x86-64-6-18-45",
+  "comparator": "partial-efault-pipe-read-v1",
+  "limits": {
+    "boot_timeout_seconds": 300,
+    "test_timeout_seconds": 30,
+    "output_bytes": 1048576,
+    "memory_bytes": 2147483648,
+    "smp": 1
+  },
+  "expected": "match"
+}
