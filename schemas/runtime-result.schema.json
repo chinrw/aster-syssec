@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/runtime-result.schema.json",
+  "title": "aster-syssec runtime execution result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result_id",
+    "request_id",
+    "request_sha256",
+    "target",
+    "platform",
+    "outcome",
+    "started_at",
+    "finished_at",
+    "duration_ms",
+    "process",
+    "guest_result",
+    "protocol_error",
+    "tool",
+    "artifacts",
+    "diagnostics"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "result_id": {
+      "type": "string",
+      "pattern": "^RUNTIME-RESULT-[0-9A-F]{16}$"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^RUNTIME-REQUEST-[0-9A-F]{16}$"
+    },
+    "request_sha256": { "$ref": "#/$defs/sha256" },
+    "target": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "platform": { "enum": ["asterinas", "linux-oracle"] },
+    "outcome": {
+      "enum": [
+        "qemu-start-failure",
+        "guest-boot-timeout",
+        "guest-panic",
+        "guest-hang",
+        "test-timeout",
+        "invalid-protocol",
+        "normal"
+      ]
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exit_code", "signal", "timed_out"],
+      "properties": {
+        "exit_code": { "type": ["integer", "null"] },
+        "signal": { "type": ["integer", "null"], "minimum": 1 },
+        "timed_out": { "type": "boolean" }
+      }
+    },
+    "guest_result": {
+      "oneOf": [
+        { "$ref": "https://asterinas.dev/syssec/guest-result.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "protocol_error": {
+      "oneOf": [
+        { "$ref": "#/$defs/protocol_error" },
+        { "type": "null" }
+      ]
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "null"] }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/artifact" }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "normal" } } },
+      "then": {
+        "properties": {
+          "guest_result": {
+            "$ref": "https://asterinas.dev/syssec/guest-result.schema.json"
+          },
+          "protocol_error": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "outcome": { "const": "invalid-protocol" } }
+      },
+      "then": {
+        "properties": {
+          "guest_result": { "type": "null" },
+          "protocol_error": { "$ref": "#/$defs/protocol_error" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "protocol_error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
