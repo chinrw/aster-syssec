@@ -279,8 +279,9 @@ Merged PR #2 defines six schemas:
 - pinned Linux oracle image;
 - oracle comparison.
 
-The comparison schema remains contract-only. No comparator producer exists.
-The repository does not bundle or build a pinned Linux image.
+`PartialEfaultComparator` now produces the case-specific comparison artifact.
+The flake builds the pinned Linux kernel/config/rootfs/packer bundle without
+checking VM binaries into Git.
 
 Merged PR #3 implements the Asterinas adapter. It:
 
@@ -293,6 +294,8 @@ Merged PR #3 implements the Asterinas adapter. It:
 - reuses an explicitly supplied or installed cargo-osdk binary;
 - writes process output directly to files to avoid pipe backpressure;
 - supervises the process group with separate boot and test deadlines;
+- extracts and verifies the exact case binary from the boot initramfs before a
+  normal result records its binary hash;
 - bounds QEMU output and stops on panic or a complete guest result;
 - hashes the request and every retained artifact;
 - validates `runtime-result.json` before atomically writing it.
@@ -349,11 +352,14 @@ SIGTERM-to-SIGKILL escalation. The seven runtime outcomes use the same
 taxonomy as the Asterinas adapter.
 
 The base rootfs and packer must emit `SYSSEC_GUEST_READY` before the exact
-binary runs. No real pinned Linux image was executed in this slice; 18 fixture
-tests establish adapter behavior, not a Linux differential baseline.
+binary runs. The flake now exports a Linux 6.18.45 kernel/config/rootfs/packer
+bundle. `docs/runtime-baseline-2026-08-26.md` records the first real Linux
+result and the matching partial-EFAULT baseline.
 
-The Linux adapter tree passed the locked package gate with 123 tests, Ruff,
-formatting, Pyright, schema validation, Actionlint, and ShellCheck.
+`PartialEfaultComparator` compares only the seven declared fields. Mismatches
+remain candidates; nonnormal results, missing fields, or unequal binary hashes
+remain incomplete. Asterinas normal results now verify the exact binary inside
+the boot initramfs before recording `tool.binary_sha256`.
 
 The static-binary exporter seam is:
 
@@ -480,18 +486,12 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Supply a pinned Linux kernel/config/base-rootfs bundle and compatible
-   initramfs packer, then retain the first real `linux-oracle` runtime result.
-2. Implement the partial-EFAULT field relation and comparison producer.
-3. Add `core`, `model`, and `lab` safety classes.
-4. Register runtime targets and expose execution through an explicit CLI/profile.
-5. Extend low-risk ABI helpers and targets: message headers, control-message
+1. Add `core`, `model`, and `lab` safety classes.
+2. Register runtime targets and expose execution through an explicit CLI/profile.
+3. Reproduce the runtime baseline in CI and retain a verified evidence pack.
+4. Extend low-risk ABI helpers and targets: message headers, control-message
    alignment/parser progress, timespec ranges, sigset size, and mmap arithmetic.
-6. Add phase-specific Specula execution, hash-bound gates, and candidate-only
+5. Add phase-specific Specula execution, hash-bound gates, and candidate-only
    result import in the model lane.
-7. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
+6. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
    only in the authorization-gated lab.
-
-For the next core slice, execute the exported descriptor and binary in one
-real pinned Linux VM without rebuilding it. Comparison remains a separate
-slice.

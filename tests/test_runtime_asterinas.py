@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import subprocess
@@ -27,6 +28,36 @@ GUEST_RESULT = {
 }
 
 
+def _newc_entry(name: str, payload: bytes, mode: int) -> bytes:
+    name_payload = name.encode() + b"\0"
+    fields = (
+        1,
+        mode,
+        0,
+        0,
+        1,
+        0,
+        len(payload),
+        0,
+        0,
+        0,
+        0,
+        len(name_payload),
+        0,
+    )
+    header = b"070701" + b"".join(f"{value:08x}".encode() for value in fields)
+    name_padding = b"\0" * (-(len(header) + len(name_payload)) % 4)
+    data_padding = b"\0" * (-len(payload) % 4)
+    return header + name_payload + name_padding + payload + data_padding
+
+
+def _write_initramfs_fixture(path: Path, binary: bytes) -> None:
+    member = "nix/store/fixture-io-test/io/file_io/partial_efault_json"
+    archive = _newc_entry(member, binary, 0o100755)
+    archive += _newc_entry("TRAILER!!!", b"", 0)
+    path.write_bytes(gzip.compress(archive, mtime=0))
+
+
 def write_runtime_source(root: Path) -> Path:
     write_fixture(root)
     files = {
@@ -37,17 +68,27 @@ def write_runtime_source(root: Path) -> Path:
         "test/initramfs/src/regression/io/file_io/partial_efault_json.c": (
             "int main(void) { return 0; }\n"
         ),
+        "artifacts/partial_efault_json": "#!/bin/sh\nexit 0\n",
     }
     for relative, content in files.items():
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+    (root / "artifacts/partial_efault_json").chmod(0o755)
+    _write_initramfs_fixture(
+        root / "artifacts/initramfs.cpio.gz",
+        (root / "artifacts/partial_efault_json").read_bytes(),
+    )
     init_git_repository(root)
     return root
 
 
 def runtime_request(source: Path, evidence_root: Path) -> dict[str, Any]:
     snapshot = inspect_source(source)
+    binary = source / "artifacts/partial_efault_json"
+    source_case = (
+        source / "test/initramfs/src/regression/io/file_io/partial_efault_json.c"
+    )
     return {
         "schema_version": 1,
         "request_id": "RUNTIME-REQUEST-0123456789ABCDEF",
@@ -63,9 +104,9 @@ def runtime_request(source: Path, evidence_root: Path) -> dict[str, Any]:
             "dirty_hash": snapshot.dirty_hash,
         },
         "binary": {
-            "path": "artifacts/partial_efault_json",
-            "sha256": SHA256,
-            "source_sha256": "b" * 64,
+            "path": str(binary),
+            "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+            "source_sha256": hashlib.sha256(source_case.read_bytes()).hexdigest(),
             "compiler": "clang fixture",
             "linker": "lld fixture",
             "build_command": {
@@ -96,6 +137,10 @@ def write_normal_make(path: Path) -> Path:
     path.write_text(
         """#!/bin/sh
 set -eu
+guest_binary=test/initramfs/build/initramfs/test/io/file_io/partial_efault_json
+mkdir -p "$(dirname "$guest_binary")"
+cp artifacts/partial_efault_json "$guest_binary"
+chmod 0755 "$guest_binary"
 args=" $* "
 [ "${RUSTUP_TOOLCHAIN:-}" = nightly-test ] || exit 65
 [ "${CARGO_NET_OFFLINE:-}" = true ] || exit 66
@@ -120,7 +165,14 @@ printf 'make stderr\n' >&2
 
 
 def write_make(path: Path, body: str) -> Path:
-    path.write_text(f"#!/bin/sh\nset -eu\n{body}", encoding="utf-8")
+    prefix = """#!/bin/sh
+set -eu
+guest_binary=test/initramfs/build/initramfs/test/io/file_io/partial_efault_json
+mkdir -p "$(dirname "$guest_binary")"
+cp artifacts/partial_efault_json "$guest_binary"
+chmod 0755 "$guest_binary"
+"""
+    path.write_text(prefix + body, encoding="utf-8")
     path.chmod(0o755)
     return path
 
@@ -139,6 +191,10 @@ class AsterinasQemuAdapterTests(unittest.TestCase):
 
             self.assertEqual(result["outcome"], "normal")
             self.assertEqual(result["guest_result"], GUEST_RESULT)
+            self.assertEqual(
+                result["tool"]["binary_sha256"],
+                runtime_request(source, root / "unused")["binary"]["sha256"],
+            )
             validate_instance(result, "runtime-result.schema.json")
             self.assertEqual(
                 json.loads((evidence_root / "runtime-result.json").read_text()),
@@ -171,6 +227,63 @@ class AsterinasQemuAdapterTests(unittest.TestCase):
                 self.assertEqual(
                     artifact["sha256"], hashlib.sha256(payload).hexdigest()
                 )
+
+    def test_normal_result_rejects_a_different_guest_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = write_runtime_source(root / "source")
+            evidence_root = root / "evidence"
+            make = write_make(
+                root / "fake-make",
+                """printf 'different guest binary\n' > "$guest_binary"
+chmod 0755 "$guest_binary"
+printf '%s\n' \\
+    '[kernel] running /init as the init process' \\
+    'SYSSEC_RESULT_BEGIN' \\
+    '{"case_id":"pipe-partial-efault-read","exit_kind":"normal"}' \\
+    'SYSSEC_RESULT_END' > qemu.log
+""",
+            )
+
+            with self.assertRaisesRegex(ValueError, "guest binary hash"):
+                AsterinasQemuAdapter(make_executable=str(make)).execute(
+                    runtime_request(source, evidence_root)
+                )
+
+            self.assertFalse((evidence_root / "runtime-result.json").exists())
+
+    def test_normal_result_verifies_binary_from_boot_initramfs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = write_runtime_source(root / "source")
+            evidence_root = root / "evidence"
+            make = write_make(
+                root / "fake-make",
+                """rm -rf test/initramfs/build/initramfs
+mkdir -p "$CARGO_TARGET_DIR/osdk/iso_root/boot"
+cp artifacts/initramfs.cpio.gz \
+    "$CARGO_TARGET_DIR/osdk/iso_root/boot/initramfs.cpio.gz"
+printf '%s\n' \\
+    '[kernel] running /init as the init process' \\
+    'SYSSEC_RESULT_BEGIN' \\
+    '{"case_id":"pipe-partial-efault-read","exit_kind":"normal"}' \\
+    'SYSSEC_RESULT_END' > qemu.log
+""",
+            )
+
+            result = AsterinasQemuAdapter(make_executable=str(make)).execute(
+                runtime_request(source, evidence_root)
+            )
+
+            self.assertEqual(result["outcome"], "normal")
+            self.assertEqual(
+                result["artifacts"]["verified_guest_binary"]["sha256"],
+                runtime_request(source, root / "unused")["binary"]["sha256"],
+            )
+            self.assertEqual(
+                result["tool"]["guest_binary_member"],
+                "nix/store/fixture-io-test/io/file_io/partial_efault_json",
+            )
 
     def test_complete_guest_result_stops_a_wrapper_that_does_not_exit(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

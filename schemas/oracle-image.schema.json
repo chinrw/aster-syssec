@@ -12,7 +12,8 @@
     "kernel_config",
     "kernel_image",
     "rootfs",
-    "qemu"
+    "qemu",
+    "packer"
   ],
   "properties": {
     "schema_version": { "const": 1 },
@@ -37,6 +38,7 @@
       "required": [
         "executable",
         "version",
+        "sha256",
         "machine",
         "cpu",
         "acceleration",
@@ -46,11 +48,28 @@
       "properties": {
         "executable": { "type": "string", "minLength": 1 },
         "version": { "type": "string", "minLength": 1 },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
         "machine": { "type": "string", "minLength": 1 },
         "cpu": { "type": "string", "minLength": 1 },
         "acceleration": { "enum": ["tcg", "kvm"] },
         "memory_bytes": { "type": "integer", "minimum": 134217728 },
         "smp": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "packer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executable", "version", "sha256"],
+      "properties": {
+        "executable": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
       }
     }
   },

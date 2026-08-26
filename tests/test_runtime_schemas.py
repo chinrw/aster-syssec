@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
 
 from aster_syssec.schemas import validate_instance
 
 SHA256 = "a" * 64
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def normal_runtime_result() -> dict[str, object]:
@@ -36,6 +39,16 @@ def normal_runtime_result() -> dict[str, object]:
 
 
 class RuntimeSchemaTests(unittest.TestCase):
+    def test_packaged_partial_efault_target_is_schema_valid(self) -> None:
+        target_path = (
+            PROJECT_ROOT
+            / "src/aster_syssec/data/runtime-targets"
+            / "pipe-partial-efault-linux-diff.json"
+        )
+        target = json.loads(target_path.read_text(encoding="utf-8"))
+
+        validate_instance(target, "runtime-target.schema.json")
+
     def test_runtime_target_accepts_the_partial_efault_contract(self) -> None:
         target = {
             "schema_version": 1,
@@ -75,11 +88,17 @@ class RuntimeSchemaTests(unittest.TestCase):
             "qemu": {
                 "executable": "qemu-system-x86_64",
                 "version": "10.1.0",
+                "sha256": SHA256,
                 "machine": "q35",
                 "cpu": "max",
                 "acceleration": "tcg",
                 "memory_bytes": 2 * 1024 * 1024 * 1024,
                 "smp": 1,
+            },
+            "packer": {
+                "executable": "syssec-initramfs-packer",
+                "version": "syssec-initramfs-packer 1.0.0",
+                "sha256": SHA256,
             },
         }
 

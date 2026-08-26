@@ -71,11 +71,19 @@ cover:
 - combined output bounds and SIGTERM-to-SIGKILL process-group cleanup;
 - packer input mutation, output overflow, and derived-rootfs symlink rejection.
 
-These fixtures do not supply a pinned Linux kernel/rootfs bundle and do not
-establish a real Linux runtime result or differential baseline.
+The flake now supplies a Linux 6.18.45 kernel/config/base-rootfs bundle and a
+hash-bound initramfs packer. A real TCG run executed the exact exported static
+binary and produced `RUNTIME-RESULT-8DC8AF20C2D95236` with `outcome=normal`.
 
-The final adapter tree passed the locked flake gate with 123 tests, Ruff lint
-and format, Pyright, JSON Schema validation, Actionlint, and ShellCheck.
+The same binary was verified inside the Asterinas boot initramfs before its
+normal result was written. `partial-efault-pipe-read-v1` compared seven fields
+and produced `ORACLE-COMPARISON-820CA758EBA9EB43` with `status=match` and
+`disposition=baseline`. Exact input, result, and artifact hashes are recorded
+in `docs/runtime-baseline-2026-08-26.md`.
+
+The final tree passed the locked flake gate with 132 tests, the packer shell
+contract, Ruff lint and format, Pyright, JSON Schema validation, Actionlint,
+and ShellCheck.
 
 ## v0.3 Host Verification baseline
 

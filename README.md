@@ -214,6 +214,11 @@ LinuxOracleAdapter(
     oracle_metadata_path=...,
     initramfs_packer_executable=...,
 ).execute(request)
+PartialEfaultComparator().compare(
+    asterinas_result_path=...,
+    linux_result_path=...,
+    output_path=...,
+)
 ```
 
 The Linux adapter verifies the runtime request, oracle metadata, kernel config,
@@ -233,11 +238,20 @@ Linux QEMU runs in a new process group with `-nic none`, the metadata-declared
 machine, CPU, acceleration, memory, and SMP. Writable environment paths,
 derived initramfs, commands, logs, and normalized results stay below a new
 evidence root. Input mutation, output overflow, derived-rootfs symlinks, and
-surviving process-group children fail closed.
+surviving process-group children fail closed. Oracle metadata also binds the
+QEMU and packer executable hashes.
 
-No pinned Linux image is bundled and no real Linux result is recorded yet.
-Fixture tests establish adapter behavior only. Comparison remains a separate
-slice.
+Build the pinned Linux 6.18.45 kernel/config/rootfs/packer bundle with:
+
+```sh
+nix build .#linux-oracle-bundle
+```
+
+The case-specific comparator requires schema-valid Asterinas and Linux normal
+results that bind the same static binary. Equal fields produce a baseline;
+differences remain candidates; missing outcomes or provenance remain
+incomplete. The first real result and comparison are recorded in
+[`docs/runtime-baseline-2026-08-26.md`](docs/runtime-baseline-2026-08-26.md).
 
 ## Inventory
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
 import signal
+import stat
 import subprocess
 import tempfile
 import time
@@ -26,6 +28,7 @@ from .protocol import BEGIN_MARKER, END_MARKER, GuestProtocolError, parse_guest_
 
 _BOOT_MARKER = b"[kernel] running /init as the init process"
 _PANIC_MARKERS = (b"kernel panic", b"panicked at ")
+_MAX_GUEST_BINARY_BYTES = 64 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,7 @@ class AsterinasQemuAdapter:
         evidence_root = Path(request_value["evidence_root"]).resolve()
         require_disjoint_paths(source_root, evidence_root)
         self._require_source(request_value, source_root)
+        _require_binary_input(request_value)
         evidence_root.mkdir(parents=True, exist_ok=False)
 
         request_path = atomic_write_json(
@@ -253,6 +257,13 @@ class AsterinasQemuAdapter:
         qemu_log: bytes | None,
         diagnostics: list[str],
     ) -> dict[str, Any]:
+        verified_binary: Path | None = None
+        guest_binary_member: str | None = None
+        if outcome == "normal":
+            verified_binary, guest_binary_member = self._require_built_binary(
+                request,
+                evidence_root,
+            )
         artifacts = {
             "request": _artifact(request_path, evidence_root),
             "stdout": _artifact(observation.stdout_path, evidence_root),
@@ -263,6 +274,11 @@ class AsterinasQemuAdapter:
                 evidence_root / "artifacts/qemu.log", qemu_log
             )
             artifacts["qemu_log"] = _artifact(qemu_log_path, evidence_root)
+        if verified_binary is not None:
+            artifacts["verified_guest_binary"] = _artifact(
+                verified_binary,
+                evidence_root,
+            )
         result_seed = {
             "request_id": request["request_id"],
             "outcome": outcome,
@@ -300,6 +316,10 @@ class AsterinasQemuAdapter:
                 "make": self._make_executable,
                 "cargo_osdk": self._cargo_osdk_executable,
                 "qemu": None,
+                "binary_sha256": (
+                    request["binary"]["sha256"] if outcome == "normal" else None
+                ),
+                "guest_binary_member": guest_binary_member,
             },
             "artifacts": artifacts,
             "diagnostics": diagnostics,
@@ -324,6 +344,9 @@ class AsterinasQemuAdapter:
         ]
         if missing:
             raise ValueError(f"Asterinas runtime seam is missing: {', '.join(missing)}")
+        case_path = source_root / f"test/initramfs/src/regression/{guest_case}.c"
+        if _sha256(case_path.read_bytes()) != request["binary"]["source_sha256"]:
+            raise ValueError("Asterinas guest case source hash does not match request")
 
         snapshot = inspect_source(source_root)
         expected = request["source"]
@@ -335,6 +358,125 @@ class AsterinasQemuAdapter:
             )
         if snapshot.dirty_entries:
             raise ValueError("Asterinas runtime execution requires a clean checkout")
+
+    @staticmethod
+    def _require_built_binary(
+        request: dict[str, Any],
+        evidence_root: Path,
+    ) -> tuple[Path, str]:
+        checkout = evidence_root / "checkout"
+        built_binary = (
+            checkout / "test/initramfs/build/initramfs/test" / request["guest_case"]
+        )
+        if built_binary.is_file() and built_binary.stat().st_mode & 0o111:
+            payload = built_binary.read_bytes()
+            member = f"test/{request['guest_case']}"
+        else:
+            archive = (
+                evidence_root
+                / "build/cargo-target/osdk/iso_root/boot/initramfs.cpio.gz"
+            )
+            payload, member = _read_initramfs_guest_binary(
+                archive,
+                request["guest_case"],
+            )
+        if _sha256(payload) != request["binary"]["sha256"]:
+            raise ValueError("Asterinas built guest binary hash does not match request")
+        copy = _atomic_write_bytes(
+            evidence_root / "artifacts/verified-guest-binary",
+            payload,
+        )
+        copy.chmod(0o755)
+        return copy, member
+
+
+def _require_binary_input(request: dict[str, Any]) -> None:
+    try:
+        binary = Path(request["binary"]["path"]).resolve(strict=True)
+    except OSError as error:
+        raise ValueError("Asterinas runtime static binary input is missing") from error
+    if not binary.is_file() or binary.stat().st_mode & 0o111 == 0:
+        raise ValueError("Asterinas runtime static binary input is not executable")
+    if _sha256(binary.read_bytes()) != request["binary"]["sha256"]:
+        raise ValueError("Asterinas runtime static binary hash does not match request")
+
+
+def _read_initramfs_guest_binary(
+    archive: Path,
+    guest_case: str,
+) -> tuple[bytes, str]:
+    if not archive.is_file():
+        raise ValueError("Asterinas initramfs lacks the requested guest binary")
+    matches: list[tuple[bytes, str]] = []
+    try:
+        with gzip.open(archive, "rb") as stream:
+            while True:
+                header = stream.read(110)
+                if not header:
+                    break
+                if len(header) != 110 or header[:6] not in (b"070701", b"070702"):
+                    raise ValueError("Asterinas initramfs is not a newc archive")
+                try:
+                    fields = [
+                        int(header[offset : offset + 8], 16)
+                        for offset in range(6, 110, 8)
+                    ]
+                except ValueError as error:
+                    raise ValueError(
+                        "Asterinas initramfs has an invalid header"
+                    ) from error
+                mode = fields[1]
+                size = fields[6]
+                name_size = fields[11]
+                if name_size < 1 or name_size > 4096:
+                    raise ValueError("Asterinas initramfs has an invalid member name")
+                name_payload = _read_exact(stream, name_size)
+                if not name_payload.endswith(b"\0"):
+                    raise ValueError(
+                        "Asterinas initramfs member name is not terminated"
+                    )
+                name = name_payload[:-1].decode("utf-8", "surrogateescape")
+                _discard(stream, _padding(110 + name_size))
+                if name == "TRAILER!!!":
+                    break
+                normalized = name.removeprefix("./")
+                is_guest_binary = (
+                    normalized == guest_case or normalized.endswith(f"/{guest_case}")
+                ) and stat.S_ISREG(mode)
+                if is_guest_binary:
+                    if size > _MAX_GUEST_BINARY_BYTES:
+                        raise ValueError(
+                            "Asterinas guest binary exceeds its size limit"
+                        )
+                    matches.append((_read_exact(stream, size), normalized))
+                else:
+                    _discard(stream, size)
+                _discard(stream, _padding(size))
+    except OSError as error:
+        raise ValueError("cannot read Asterinas initramfs") from error
+    if len(matches) != 1:
+        raise ValueError("Asterinas initramfs lacks one unambiguous guest binary")
+    return matches[0]
+
+
+def _read_exact(stream: Any, size: int) -> bytes:
+    payload = stream.read(size)
+    if len(payload) != size:
+        raise ValueError("Asterinas initramfs is truncated")
+    return payload
+
+
+def _discard(stream: Any, size: int) -> None:
+    remaining = size
+    while remaining:
+        chunk = stream.read(min(remaining, 1024 * 1024))
+        if not chunk:
+            raise ValueError("Asterinas initramfs is truncated")
+        remaining -= len(chunk)
+
+
+def _padding(size: int) -> int:
+    return (-size) % 4
 
 
 def _run_make(

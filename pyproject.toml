@@ -23,7 +23,12 @@ syssec = "aster_syssec.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-aster_syssec = ["data/*.toml", "data/tracks/*.toml", "data/targets/*/*.toml"]
+aster_syssec = [
+  "data/*.toml",
+  "data/runtime-targets/*.json",
+  "data/tracks/*.toml",
+  "data/targets/*/*.toml",
+]
 
 [tool.setuptools.data-files]
 "share/aster-syssec" = ["flake.lock"]
