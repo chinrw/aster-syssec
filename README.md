@@ -30,6 +30,7 @@ Version 0.3 implements:
 - strict runtime evidence schemas and marker-delimited guest result parsing;
 - isolated Asterinas QEMU execution with normalized runtime results;
 - exact initramfs static-binary export with Nix, compiler, and linker provenance;
+- pinned, networkless Linux QEMU execution of an existing exported binary;
 - verified evidence packing with explicit byte and file budgets;
 - manually selectable PR and nightly CI profiles with per-target summaries.
 
@@ -39,10 +40,10 @@ targets require their matching production helper packages in the Asterinas
 checkout; `targets check` fails before execution when the package, symbol,
 harness, test, or fuzz target is absent.
 
-Version 0.3 does not implement differential VM execution, fault injection,
-kernel sequence fuzzing, Specula phase gates, or finding promotion. Engine
-results remain candidates and cannot become confirmed findings through the
-current CLI.
+Version 0.3 does not implement Asterinas/Linux comparison, fault injection,
+kernel sequence fuzzing, Specula phase gates, or finding promotion. Engine and
+runtime results remain evidence inputs and cannot become confirmed findings
+through the current CLI.
 
 ## Install
 
@@ -201,6 +202,42 @@ syssec run \
 
 `external_required` entries remain explicit gaps in `profile/result.json`; the
 orchestrator does not report them as executed.
+
+## Runtime adapters
+
+Runtime execution is available as library seams and is not registered in the
+CLI or default profiles:
+
+```python
+AsterinasQemuAdapter(...).execute(request)
+LinuxOracleAdapter(
+    oracle_metadata_path=...,
+    initramfs_packer_executable=...,
+).execute(request)
+```
+
+The Linux adapter verifies the runtime request, oracle metadata, kernel config,
+kernel image, base rootfs, QEMU identity, and exported static binary before
+creating evidence. It calls the packer with:
+
+```text
+<packer> --base-rootfs <base> --binary <exact-export> --output <derived>
+```
+
+The packer must also support `--version`. The pinned base rootfs and packer
+must arrange for `/init` to emit `SYSSEC_GUEST_READY` before executing the
+binary. Guest results continue to use `SYSSEC_RESULT_BEGIN` and
+`SYSSEC_RESULT_END`.
+
+Linux QEMU runs in a new process group with `-nic none`, the metadata-declared
+machine, CPU, acceleration, memory, and SMP. Writable environment paths,
+derived initramfs, commands, logs, and normalized results stay below a new
+evidence root. Input mutation, output overflow, derived-rootfs symlinks, and
+surviving process-group children fail closed.
+
+No pinned Linux image is bundled and no real Linux result is recorded yet.
+Fixture tests establish adapter behavior only. Comparison remains a separate
+slice.
 
 ## Inventory
 
@@ -375,3 +412,4 @@ unexpected exception leaves the manifest marked `failed`.
 - [Specula handoff schema](schemas/specula-handoff.schema.json)
 - [Asterinas review handoff schema](schemas/agent-review-handoff.schema.json)
 - [Trace event schema](schemas/trace-event.schema.json)
+- [Linux execution provenance schema](schemas/linux-execution.schema.json)

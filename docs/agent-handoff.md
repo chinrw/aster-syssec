@@ -16,7 +16,7 @@ git status --short --branch
 git rev-parse HEAD
 git log --oneline --decorate -12
 git diff --stat origin/main...HEAD
-gh pr view 6 --repo chinrw/aster-syssec
+gh pr list --repo chinrw/aster-syssec --state open --limit 10
 gh pr view 5 --repo chinrw/asterinas
 gh run list --repo chinrw/aster-syssec --branch main --limit 5
 ```
@@ -46,7 +46,7 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 
 | State | Revision | Scope |
 | --- | --- | --- |
-| merged `main` | `b26364a` | PR #1-#6: Host Verification, Runtime Foundation, binary export, and bounded CI evidence |
+| merged `main` | `6d0c65b` | PR #1-#7: Host Verification, Runtime Foundation, binary export, bounded CI evidence, and current handoff |
 | signed tag `v0.3.0` | `421c9d9` | v0.3 Host Verification record |
 
 All six aster-syssec PRs are merged. PR #6 head
@@ -83,11 +83,13 @@ The three persistent Asterinas seam PRs are merged in `chinrw/asterinas`:
 | #3 `syssec-fd-protocol` | `5eb921ef74cbd397118270c2e27b38bac4103ff8` | reserved FD protocol and Loom model |
 | #4 `syssec-runtime-harness` | `da81ae952e245b6bb60229457f090575c4fe97f6` | isolated guest case runner and partial-EFAULT case |
 
-`chinrw/asterinas` PR #5 is the remaining owner action. It adds target-specific
-static linking for `partial_efault_json`. Its signed head is
+`chinrw/asterinas` PR #5 merged as
+`fdb34332d9de81d39e5a4cb4c5077446018b27bb`. It adds target-specific static
+linking for `partial_efault_json`. Its signed content head is
 `d0bddbf56d893221d103a0c3330f379dc59977b9`; the aster-syssec flake pins this
 revision so the exporter cannot silently consume the earlier dynamic binary.
-At this snapshot the PR is clean, mergeable, and all reported checks pass.
+The content head is the merge commit's second parent and is reachable from
+`chinrw/asterinas/main`.
 
 The previous v0.3 pin was the runtime-harness content commit. The current pin
 descends from the merged seam stack and adds only target-specific static linking
@@ -110,6 +112,8 @@ Asterinas source (read-only, exact revision)
   +-- agent/specula preparation --> hash-bound handoff script
   |
   +-- runtime request --> strict guest protocol --> Asterinas QEMU adapter
+                         |                        --> runtime-result + logs
+                         +-- pinned oracle ------> Linux QEMU adapter
                                                   --> runtime-result + logs
 
 All writable state belongs below an evidence/work root disjoint from source.
@@ -124,7 +128,7 @@ The main implementation areas are:
 | inventory and routing | `inventory.py`, `routing.py`, `data/tracks/*.toml` |
 | static review | `scanner.py`, `selection.py`, `data/invariants.toml` |
 | Host Verification | `targets.py`, `engines/*.py`, `data/targets/*/*.toml` |
-| Runtime Foundation | `runtime/protocol.py`, `runtime/asterinas.py`, `schemas/runtime-*.json` |
+| Runtime Foundation | `runtime/protocol.py`, `runtime/asterinas.py`, `runtime/linux.py`, `runtime/binary.py`, runtime schemas |
 | external analysis handoffs | `agent_review.py`, `specula.py` |
 | CI and pinned environments | `flake.nix`, `flake.lock`, `.github/workflows/ci.yml` |
 
@@ -275,8 +279,8 @@ Merged PR #2 defines six schemas:
 - pinned Linux oracle image;
 - oracle comparison.
 
-The oracle image and comparison schemas are contracts only. No Linux image
-builder, Linux QEMU adapter, or comparator producer exists.
+The comparison schema remains contract-only. No comparator producer exists.
+The repository does not bundle or build a pinned Linux image.
 
 Merged PR #3 implements the Asterinas adapter. It:
 
@@ -322,6 +326,34 @@ Evidence layout:
 
 There is no runtime CLI or runtime profile yet. The Asterinas adapter does not
 run the Linux oracle.
+
+The Linux adapter seam is:
+
+```python
+LinuxOracleAdapter(
+    oracle_metadata_path=...,
+    initramfs_packer_executable=...,
+).execute(request) -> dict
+```
+
+It verifies every declared oracle and binary hash before writing evidence,
+then calls the supplied packer with the base rootfs, exact exported binary, and
+a run-local output path. Packer identity, QEMU identity, commands, isolated
+writable environment, input hashes, and the derived initramfs hash are bound by
+`linux-execution.schema.json`.
+
+QEMU runs directly with `-nic none` and the metadata-declared machine, CPU,
+acceleration, memory, and SMP. The adapter uses separate boot/test deadlines,
+bounds retained output, and terminates the entire process group with
+SIGTERM-to-SIGKILL escalation. The seven runtime outcomes use the same
+taxonomy as the Asterinas adapter.
+
+The base rootfs and packer must emit `SYSSEC_GUEST_READY` before the exact
+binary runs. No real pinned Linux image was executed in this slice; 18 fixture
+tests establish adapter behavior, not a Linux differential baseline.
+
+The Linux adapter tree passed the locked package gate with 123 tests, Ruff,
+formatting, Pyright, schema validation, Actionlint, and ShellCheck.
 
 The static-binary exporter seam is:
 
@@ -423,7 +455,8 @@ nix develop .#default --command env PYTHONPATH=src python3 -m unittest \
   tests.test_runtime_protocol \
   tests.test_runtime_schemas \
   tests.test_runtime_asterinas \
-  tests.test_runtime_binary
+  tests.test_runtime_binary \
+  tests.test_runtime_linux
 ```
 
 Do not reuse a non-empty evidence root for an adapter execution. Do not place
@@ -439,19 +472,18 @@ the work root below source or source below the work root.
 | change evidence lifecycle | `docs/reviewer-contract.md`, `runs.py`, relevant schemas | source/artifact mutation is detected before completion and report consumption |
 | change CI evidence packing | `evidence.py`, `evidence-pack.schema.json`, workflow tests | only verified manifest entries are copied and byte/file budgets fail closed |
 | change guest parsing | `runtime/protocol.py`, parser tests, guest schema | every stable error code and size/encoding boundary remains covered |
-| change QEMU supervision | `runtime/asterinas.py`, adapter tests, runtime-result schema | every outcome is distinguishable through `execute()` and no child process survives |
+| change QEMU supervision | `runtime/asterinas.py`, `runtime/linux.py`, adapter tests, runtime-result schema | every outcome is distinguishable through `execute()` and no child process survives |
 | change binary export | `runtime/binary.py`, binary schemas, Asterinas initramfs build path | exported bytes equal the Nix output; provenance binds source, toolchain, command, and static ELF evidence |
-| add Linux oracle | oracle image schema, runtime result schema | pinned image metadata and the same binary produce a validated result |
+| change Linux oracle | `runtime/linux.py`, Linux execution schema, adapter tests | every input hash is rechecked, derived state stays below evidence, and no QEMU child survives |
 | add comparator | oracle comparison schema, one runtime case contract | every compared field has an explicit relation; mismatch remains candidate |
 | extend Specula | `specula.py`, handoff schema, Track readiness | phase artifacts are hash-bound and imported counterexamples remain candidates |
 
 ## Next work
 
-1. Merge `chinrw/asterinas` PR #5 and verify that
-   `d0bddbf56d893221d103a0c3330f379dc59977b9` is reachable from its `main`.
-2. Add a Linux QEMU adapter using pinned oracle metadata and the exported
-   binary without rebuilding it.
-3. Implement the partial-EFAULT field relation and comparison producer.
+1. Supply a pinned Linux kernel/config/base-rootfs bundle and compatible
+   initramfs packer, then retain the first real `linux-oracle` runtime result.
+2. Implement the partial-EFAULT field relation and comparison producer.
+3. Add `core`, `model`, and `lab` safety classes.
 4. Register runtime targets and expose execution through an explicit CLI/profile.
 5. Extend low-risk ABI helpers and targets: message headers, control-message
    alignment/parser progress, timespec ranges, sigset size, and mmap arithmetic.
@@ -460,5 +492,6 @@ the work root below source or source below the work root.
 7. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
    only in the authorization-gated lab.
 
-For the next core slice, consume the exported descriptor and binary in one
-pinned Linux VM without rebuilding it. Comparison remains a separate slice.
+For the next core slice, execute the exported descriptor and binary in one
+real pinned Linux VM without rebuilding it. Comparison remains a separate
+slice.
