@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ..engine_results import EngineExecution, evidence_id
 from ..targets import VerificationTarget
-from .base import EngineContext
+from .base import EngineContext, resolve_cache_root
 from .process import ProcessResult, run_process
 
 _COMPLETE = re.compile(
@@ -52,8 +52,9 @@ def execute_kani(target: VerificationTarget, context: EngineContext) -> EngineEx
     prefix = f"engines/kani/{target.id}"
     build_root = context.run.root / "build/kani"
     temporary_root = context.run.root / "tmp"
-    kani_home = context.work_root / "cache/kani"
-    rustup_home = context.work_root / "cache/kani-rustup"
+    cache_root = resolve_cache_root(context)
+    kani_home = cache_root / "kani"
+    rustup_home = cache_root / "kani-rustup"
     for path in (build_root, temporary_root, kani_home, rustup_home):
         path.mkdir(parents=True, exist_ok=True)
     isolated = {
@@ -139,7 +140,7 @@ def execute_kani(target: VerificationTarget, context: EngineContext) -> EngineEx
     tool_version = _command_version(
         [cargo, "kani", "--version"], context.source_root, environment
     )
-    bundle = _kani_bundle(context.work_root, tool_version)
+    bundle = _kani_bundle(cache_root, tool_version)
     cbmc = shutil.which("cbmc", path=environment.get("PATH"))
     cbmc_version = (
         _command_version([cbmc, "--version"], context.source_root, environment)
@@ -300,11 +301,11 @@ def _concrete_playback(output: str) -> str | None:
     return match.group(1).rstrip() + "\n" if match else None
 
 
-def _kani_bundle(work_root: Path, tool_version: str | None) -> dict[str, str | None]:
+def _kani_bundle(cache_root: Path, tool_version: str | None) -> dict[str, str | None]:
     match = re.search(r"\b(\d+\.\d+\.\d+)\b", tool_version or "")
     if match is None:
         return {"rust_toolchain": None, "rustc_version": None}
-    bundle = work_root / "cache/kani" / f"kani-{match.group(1)}"
+    bundle = cache_root / "kani" / f"kani-{match.group(1)}"
     return {
         "rust_toolchain": _read_optional(bundle / "rust-toolchain-version"),
         "rustc_version": _read_optional(bundle / "rustc-version"),

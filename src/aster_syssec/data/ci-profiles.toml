@@ -18,6 +18,7 @@ blocking = [
   "known candidate policy selected by --fail-on-candidates",
 ]
 external_required = ["make check", "targeted regression", "known reproducer replay"]
+fail_fast = true
 
 [profiles.nightly]
 implemented_commands = ["inventory --check", "review"]
@@ -37,6 +38,7 @@ targets = [
 external_required = [
   "SMP regression", "LTP", "kselftest", "gVisor", "differential corpus",
 ]
+fail_fast = false
 
 [profiles.weekly]
 implemented_commands = ["model --stage analysis"]

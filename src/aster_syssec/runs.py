@@ -115,6 +115,14 @@ class RunContext:
         self._register(resolved, media_type=media_type or _media_type(resolved))
         return resolved
 
+    def artifact_record(self, relative: str) -> dict[str, Any]:
+        self._require_running()
+        normalized = self._relative_output(self._output_path(relative))
+        try:
+            return dict(self._artifacts[normalized])
+        except KeyError as error:
+            raise ValueError(f"run artifact is not registered: {normalized}") from error
+
     def complete(self, outputs: Iterable[Path] = ()) -> None:
         self._require_running()
         self._verify_source()
