@@ -57,6 +57,26 @@ The old scheduled run failed before artifact upload. `iovec-host-fuzz` returned
 runner cache; fail-fast then skipped Loom. Nightly now primes the locked fuzz
 dependencies before offline execution and reports the complete target matrix.
 
+## Linux oracle adapter validation
+
+The Linux adapter was validated through 18 public-seam fixture tests. They
+cover:
+
+- the exact exported-binary hash and all oracle input hashes;
+- QEMU semantic version and full tool identity;
+- a run-local derived initramfs and schema-validated execution provenance;
+- `-nic none`, TCG machine parameters, and evidence-root writable paths;
+- QEMU start failure, boot timeout, panic, guest hang, test timeout, invalid
+  protocol, and normal completion;
+- combined output bounds and SIGTERM-to-SIGKILL process-group cleanup;
+- packer input mutation, output overflow, and derived-rootfs symlink rejection.
+
+These fixtures do not supply a pinned Linux kernel/rootfs bundle and do not
+establish a real Linux runtime result or differential baseline.
+
+The final adapter tree passed the locked flake gate with 123 tests, Ruff lint
+and format, Pyright, JSON Schema validation, Actionlint, and ShellCheck.
+
 ## v0.3 Host Verification baseline
 
 Observed on 2026-08-24 against clean revisions:
@@ -135,10 +155,14 @@ The original mixed commits were split and replayed onto upstream Asterinas
 | `syssec-uapi-seams` | `bb2c0f5e236b7b38478b4961565350716bcfe5d4` | UAPI helper, production iovec integration, Kani, Miri, layout, fuzz |
 | `syssec-fd-protocol` | `13cf3c95ae0be904ef1e1729e9e379b66f0964c7` | reserved FD protocol, FileTable/pipe2/pidfd integration, Loom |
 | `syssec-runtime-harness` | `490960ace3e15bf74146e406ec11a9425755cfba` | isolated initramfs runner, hostfwd disable, partial-EFAULT case |
+| `syssec-static-runtime-binary` | `d0bddbf56d893221d103a0c3330f379dc59977b9` | target-specific static link for the partial-EFAULT case |
 
-All three branches exist on `chinrw/asterinas`. Each commit has a
+All four content heads exist on `chinrw/asterinas`. PR #5 merged as
+`fdb34332d9de81d39e5a4cb4c5077446018b27bb`, with `d0bddbf...` as its second
+parent. Each content commit has a
 `Signed-off-by` trailer. The temporary clone could not reach the SSH signing
-agent, so these three commits are unsigned.
+agent, so the original three seam commits are unsigned. The PR #5 content head
+is signed.
 
 Validation on the final stack included:
 
