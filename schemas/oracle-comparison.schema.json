@@ -35,7 +35,12 @@
       "type": "string",
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*-v[1-9][0-9]*$"
     },
-    "binary_sha256": { "$ref": "#/$defs/sha256" },
+    "binary_sha256": {
+      "oneOf": [
+        { "$ref": "#/$defs/sha256" },
+        { "type": "null" }
+      ]
+    },
     "asterinas_result": { "$ref": "#/$defs/result_reference" },
     "linux_result": { "$ref": "#/$defs/result_reference" },
     "status": { "enum": ["match", "mismatch", "incomplete"] },
@@ -73,6 +78,7 @@
       "then": {
         "properties": {
           "disposition": { "const": "baseline" },
+          "binary_sha256": { "$ref": "#/$defs/sha256" },
           "fields": {
             "items": {
               "properties": { "matched": { "const": true } }
@@ -86,6 +92,7 @@
       "then": {
         "properties": {
           "disposition": { "const": "candidate" },
+          "binary_sha256": { "$ref": "#/$defs/sha256" },
           "fields": {
             "contains": {
               "required": ["matched"],
