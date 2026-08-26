@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/binary-provenance.schema.json",
+  "title": "aster-syssec static binary provenance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provenance_id",
+    "request_id",
+    "request_sha256",
+    "created_at",
+    "target",
+    "guest_case",
+    "target_arch",
+    "source",
+    "binary",
+    "nix",
+    "verification",
+    "artifacts",
+    "diagnostics"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "provenance_id": {
+      "type": "string",
+      "pattern": "^BINARY-PROVENANCE-[0-9A-F]{16}$"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^BINARY-EXPORT-REQUEST-[0-9A-F]{16}$"
+    },
+    "request_sha256": { "$ref": "#/$defs/sha256" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "target": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "guest_case": { "type": "string", "minLength": 1 },
+    "target_arch": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "revision",
+        "dirty_hash",
+        "case_path",
+        "case_sha256"
+      ],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 1 },
+        "dirty_hash": { "$ref": "#/$defs/sha256" },
+        "case_path": { "type": "string", "minLength": 1 },
+        "case_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "binary": {
+      "$ref": "https://asterinas.dev/syssec/static-binary.schema.json"
+    },
+    "nix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "derivation",
+        "output",
+        "compiler_executable",
+        "linker_executable"
+      ],
+      "properties": {
+        "derivation": { "type": "string", "minLength": 1 },
+        "output": { "type": "string", "minLength": 1 },
+        "compiler_executable": { "type": "string", "minLength": 1 },
+        "linker_executable": { "type": "string", "minLength": 1 }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "elf_class",
+        "machine",
+        "interpreter",
+        "dynamic_dependencies",
+        "statically_linked"
+      ],
+      "properties": {
+        "elf_class": { "type": "string", "minLength": 1 },
+        "machine": { "type": "string", "minLength": 1 },
+        "interpreter": { "type": "null" },
+        "dynamic_dependencies": {
+          "type": "array",
+          "maxItems": 0
+        },
+        "statically_linked": { "const": true }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/artifact" }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

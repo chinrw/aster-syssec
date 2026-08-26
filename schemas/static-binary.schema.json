@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/static-binary.schema.json",
+  "title": "aster-syssec reusable static runtime binary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "path",
+    "sha256",
+    "source_sha256",
+    "compiler",
+    "linker",
+    "build_command"
+  ],
+  "properties": {
+    "path": { "type": "string", "minLength": 1 },
+    "sha256": { "$ref": "#/$defs/sha256" },
+    "source_sha256": { "$ref": "#/$defs/sha256" },
+    "compiler": { "type": "string", "minLength": 1 },
+    "linker": { "type": "string", "minLength": 1 },
+    "build_command": {
+      "$ref": "https://asterinas.dev/syssec/engine-command.schema.json"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
