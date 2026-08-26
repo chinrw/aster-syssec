@@ -92,6 +92,8 @@ class RuntimeSchemaTests(unittest.TestCase):
             "created_at": "2026-08-24T00:00:00Z",
             "target": "pipe-partial-efault-linux-diff",
             "target_config_sha256": SHA256,
+            "guest_case": "io/file_io/partial_efault_json",
+            "target_arch": "x86_64",
             "platform": "asterinas",
             "source": {
                 "path": "/source/asterinas",
