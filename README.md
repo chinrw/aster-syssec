@@ -26,7 +26,10 @@ Version 0.3 implements:
 - schema-validated verification targets and checkout preflight;
 - isolated Kani, Miri, cross-target layout, cargo-fuzz, and Loom adapters;
 - normalized engine plans, commands, environments, results, and raw logs;
-- bounded CI profile orchestration with per-command and per-target policy.
+- bounded CI profile orchestration with per-command and per-target policy;
+- strict runtime evidence schemas and marker-delimited guest result parsing;
+- isolated Asterinas QEMU execution with normalized runtime results;
+- exact initramfs static-binary export with Nix, compiler, and linker provenance.
 
 The bundled vertical slice contains five Kani proofs, one Miri test, three
 bare-metal layout targets, one cargo-fuzz target, and one Loom model. These
@@ -53,7 +56,7 @@ nix develop .#kernel-fuzz   # formal shell plus Go/QEMU/syzkaller
 ```
 
 The default flake input reads the Rust channel, components, and targets from
-Asterinas revision `490960ace3e15bf74146e406ec11a9425755cfba`. Override it
+Asterinas revision `d0bddbf56d893221d103a0c3330f379dc59977b9`. Override it
 when reviewing another checkout:
 
 ```sh

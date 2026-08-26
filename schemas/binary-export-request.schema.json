@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://asterinas.dev/syssec/runtime-request.schema.json",
-  "title": "aster-syssec runtime execution request",
+  "$id": "https://asterinas.dev/syssec/binary-export-request.schema.json",
+  "title": "aster-syssec static binary export request",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -12,19 +12,15 @@
     "target_config_sha256",
     "guest_case",
     "target_arch",
-    "platform",
     "source",
-    "binary",
-    "oracle",
     "evidence_root",
-    "execution",
     "limits"
   ],
   "properties": {
     "schema_version": { "const": 1 },
     "request_id": {
       "type": "string",
-      "pattern": "^RUNTIME-REQUEST-[0-9A-F]{16}$"
+      "pattern": "^BINARY-EXPORT-REQUEST-[0-9A-F]{16}$"
     },
     "created_at": { "type": "string", "format": "date-time" },
     "target": {
@@ -37,7 +33,6 @@
       "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
     },
     "target_arch": { "type": "string", "minLength": 1 },
-    "platform": { "enum": ["asterinas", "linux-oracle"] },
     "source": {
       "type": "object",
       "additionalProperties": false,
@@ -48,49 +43,13 @@
         "dirty_hash": { "$ref": "#/$defs/sha256" }
       }
     },
-    "binary": {
-      "$ref": "https://asterinas.dev/syssec/static-binary.schema.json"
-    },
-    "oracle": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "metadata_sha256"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-        },
-        "metadata_sha256": { "$ref": "#/$defs/sha256" }
-      }
-    },
     "evidence_root": { "type": "string", "minLength": 1 },
-    "execution": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "acceleration",
-        "host_forwarding",
-        "memory_bytes",
-        "smp"
-      ],
-      "properties": {
-        "acceleration": { "enum": ["tcg", "kvm"] },
-        "host_forwarding": { "const": false },
-        "memory_bytes": { "type": "integer", "minimum": 134217728 },
-        "smp": { "type": "integer", "minimum": 1 }
-      }
-    },
     "limits": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "boot_timeout_seconds",
-        "test_timeout_seconds",
-        "output_bytes"
-      ],
+      "required": ["build_timeout_seconds", "output_bytes"],
       "properties": {
-        "boot_timeout_seconds": { "type": "integer", "minimum": 1 },
-        "test_timeout_seconds": { "type": "integer", "minimum": 1 },
+        "build_timeout_seconds": { "type": "integer", "minimum": 1 },
         "output_bytes": { "type": "integer", "minimum": 1024 }
       }
     }

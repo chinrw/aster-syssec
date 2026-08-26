@@ -1,5 +1,42 @@
 # Validation
 
+## Current static-binary candidate
+
+The 2026-08-26 candidate pins Asterinas
+`d0bddbf56d893221d103a0c3330f379dc59977b9` with NAR hash
+`sha256-eUJRAbB3KLNJTWB20lgIE+YeBSbaV9aNq8Q98w9YJaY=`. That revision adds
+target-specific static linking for `partial_efault_json` on top of the merged
+verification seams.
+
+A real initramfs export produced byte-identical Nix-store and evidence copies
+at SHA-256
+`696ed3ef05cda1b7d8e5f9b45bd1706ae4eef186736f028641fdf17e09cc7089`.
+The source SHA-256 was
+`374f9297db7164ecbc7c8bb2e0f3e5b37478ddd8b16aba1d5c8309619eeeebda`.
+The derivation resolved GCC 14.2.1 and GNU ld 2.44. `readelf` reported no
+interpreter and no dynamic-library dependencies.
+
+This validates binary export and provenance only. It does not supply Linux VM
+execution or differential comparison.
+
+The candidate passed:
+
+```text
+nix flake check: 21 checks passed
+unit tests: 95 passed
+focused Runtime Foundation tests: 40 passed
+Ruff lint and format: passed
+Pyright: passed
+JSON Schema metaschema validation: passed
+Actionlint: passed
+ShellCheck: passed
+config-check: 0 issues
+inventory --check: 250 syscalls, 0 errors
+targets check: 11 targets, 0 issues
+```
+
+## v0.3 Host Verification baseline
+
 Observed on 2026-08-24 against clean revisions:
 
 - aster-syssec `5f8f38cfd8a05397e1ac17a777d985102ef81dbc`;
@@ -7,7 +44,7 @@ Observed on 2026-08-24 against clean revisions:
 - Rust `nightly-2026-07-21` for Miri, layout, fuzz, and Loom;
 - Kani `0.67.0` with CBMC `6.8.0`.
 
-The flake locks `chinrw/asterinas` at that Asterinas revision with NAR hash
+At that baseline, the flake locked `chinrw/asterinas` with NAR hash
 `sha256-IjQP49RonXGFv0Bg9KagDJ3ml58F8pePM2p0A0ANpsA=`.
 
 ## Package and checkout gates

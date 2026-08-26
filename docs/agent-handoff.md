@@ -1,6 +1,6 @@
 # Agent handoff
 
-Snapshot: 2026-08-25
+Snapshot: 2026-08-26
 
 Use this document when continuing Host Verification, Runtime Foundation,
 syscall analysis, or Specula integration. Refresh the repository identities
@@ -49,9 +49,10 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 | signed tag `v0.3.0` | `421c9d9` | v0.3 Host Verification record |
 | open PR #2 | `6e35d0016344832b54c07641a62f1ebde13ba56b` | Runtime schemas and strict guest parser |
 | open PR #3 | `c11f7530d4f6c6a7094041e19fd59e95592d9970` | Asterinas QEMU adapter, stacked on PR #2 |
+| open PR #4 | `b745a346933abc2d7867656b1e9ebe8b29b27d80` | Current agent handoff, stacked on PR #3 |
 
-PR #2 and PR #3 had successful `validate` and `host-verification` checks at
-this snapshot. Integrate them in stack order. Neither PR was merged.
+PR #2, PR #3, and PR #4 had successful `validate` and `host-verification`
+checks at this snapshot. Integrate them in stack order. None was merged.
 
 The package version remains `0.3.0`. Runtime work has not changed the release
 tag.
@@ -61,8 +62,8 @@ tag.
 `flake.lock` and GitHub Actions pin:
 
 ```text
-490960ace3e15bf74146e406ec11a9425755cfba
-sha256-IjQP49RonXGFv0Bg9KagDJ3ml58F8pePM2p0A0ANpsA=
+d0bddbf56d893221d103a0c3330f379dc59977b9
+sha256-eUJRAbB3KLNJTWB20lgIE+YeBSbaV9aNq8Q98w9YJaY=
 ```
 
 The three persistent Asterinas seam PRs are merged in `chinrw/asterinas`:
@@ -73,10 +74,15 @@ The three persistent Asterinas seam PRs are merged in `chinrw/asterinas`:
 | #3 `syssec-fd-protocol` | `5eb921ef74cbd397118270c2e27b38bac4103ff8` | reserved FD protocol and Loom model |
 | #4 `syssec-runtime-harness` | `da81ae952e245b6bb60229457f090575c4fe97f6` | isolated guest case runner and partial-EFAULT case |
 
-The flake pin is the runtime-harness content commit before the later SPDX fix
-was propagated through the stack. Do not silently replace the pin with a PR
-head; update `flake.lock`, checkout preflight, validation evidence, and this
-snapshot together.
+Asterinas PR #5 adds target-specific static linking for
+`partial_efault_json`. Its signed head is
+`d0bddbf56d893221d103a0c3330f379dc59977b9`; the aster-syssec flake pins this
+revision so the exporter cannot silently consume the earlier dynamic binary.
+
+The previous v0.3 pin was the runtime-harness content commit. The current pin
+descends from the merged seam stack and adds only target-specific static linking
+for the syssec case. Update `flake.lock`, checkout preflight, validation
+evidence, and this snapshot together whenever the pin changes.
 
 ## System map
 
@@ -298,16 +304,28 @@ Evidence layout:
     └── qemu.log
 ```
 
-There is no runtime CLI or runtime profile yet. The request schema requires
-binary and oracle identities, but the Asterinas adapter does not export the
-initramfs binary or run the Linux oracle.
+There is no runtime CLI or runtime profile yet. The Asterinas adapter does not
+run the Linux oracle.
+
+The static-binary exporter seam is:
+
+```python
+AsterinasStaticBinaryExporter(...).export(request) -> dict
+```
+
+It builds the actual initramfs root derivation in an isolated checkout, copies
+the selected executable out of its Nix store output, rejects interpreter or
+dynamic-library dependencies, and writes `binary-provenance.json`. The reusable
+binary descriptor records the exact binary and case-source hashes, compiler,
+linker, and build command. Raw derivation, tool-version, ELF, and build logs are
+hashed artifacts.
 
 ## Executed evidence
 
 Host Verification was executed on clean aster-syssec `5f8f38c` and Asterinas
 `490960ace`. `VALIDATION.md` records the environment and result bounds.
 
-The current QEMU adapter tree passed the locked package gate with 88 tests,
+The current Runtime Foundation tree passed the locked package gate with 95 tests,
 Ruff, formatting, Pyright, schema validation, Actionlint, and ShellCheck. PR #3
 passed both remote CI jobs.
 
@@ -323,6 +341,17 @@ This is a positive contract baseline, not Linux differential evidence or a
 finding. The smoke preceded a final diagnostics-only text change. The exact PR
 head passed the full flake gate, but the full TCG smoke was not repeated after
 that text change.
+
+The static-binary exporter ran against clean Asterinas
+`d0bddbf56d893221d103a0c3330f379dc59977b9`. The Nix store binary and exported
+copy were byte-identical at SHA-256
+`696ed3ef05cda1b7d8e5f9b45bd1706ae4eef186736f028641fdf17e09cc7089`.
+The case source SHA-256 was
+`374f9297db7164ecbc7c8bb2e0f3e5b37478ddd8b16aba1d5c8309619eeeebda`.
+Provenance resolved GCC 14.2.1 and GNU ld 2.44 from the Nix derivation. ELF
+evidence contained no interpreter or dynamic-library dependency. This proves
+export and provenance only; neither VM differential execution nor comparison
+was performed.
 
 ## Safety lanes
 
@@ -374,10 +403,11 @@ nix develop .#formal --command syssec run \
 Focused Runtime Foundation tests:
 
 ```sh
-nix develop .#default --command python3 -m unittest \
+nix develop .#default --command env PYTHONPATH=src python3 -m unittest \
   tests.test_runtime_protocol \
   tests.test_runtime_schemas \
-  tests.test_runtime_asterinas
+  tests.test_runtime_asterinas \
+  tests.test_runtime_binary
 ```
 
 Do not reuse a non-empty evidence root for an adapter execution. Do not place
@@ -393,26 +423,24 @@ the work root below source or source below the work root.
 | change evidence lifecycle | `docs/reviewer-contract.md`, `runs.py`, relevant schemas | source/artifact mutation is detected before completion and report consumption |
 | change guest parsing | `runtime/protocol.py`, parser tests, guest schema | every stable error code and size/encoding boundary remains covered |
 | change QEMU supervision | `runtime/asterinas.py`, adapter tests, runtime-result schema | every outcome is distinguishable through `execute()` and no child process survives |
-| add binary export | runtime request schema, Asterinas initramfs build path | one exact static binary and build provenance are hashed and reusable by both VMs |
+| change binary export | `runtime/binary.py`, binary schemas, Asterinas initramfs build path | exported bytes equal the Nix output; provenance binds source, toolchain, command, and static ELF evidence |
 | add Linux oracle | oracle image schema, runtime result schema | pinned image metadata and the same binary produce a validated result |
 | add comparator | oracle comparison schema, one runtime case contract | every compared field has an explicit relation; mismatch remains candidate |
 | extend Specula | `specula.py`, handoff schema, Track readiness | phase artifacts are hash-bound and imported counterexamples remain candidates |
 
 ## Next work
 
-1. Integrate PR #2, then PR #3, without flattening their review boundaries.
-2. Export and hash the exact static binary built into the Asterinas initramfs.
-3. Add pinned Linux oracle metadata and a Linux QEMU adapter using that binary.
-4. Implement the partial-EFAULT field relation and comparison producer.
-5. Register runtime targets and expose execution through an explicit CLI/profile.
-6. Extend low-risk ABI helpers and targets: message headers, control-message
+1. Integrate PR #2, PR #3, and PR #4 without flattening their review boundaries.
+2. Add pinned Linux oracle metadata and a Linux QEMU adapter using the exported
+   binary without rebuilding it.
+3. Implement the partial-EFAULT field relation and comparison producer.
+4. Register runtime targets and expose execution through an explicit CLI/profile.
+5. Extend low-risk ABI helpers and targets: message headers, control-message
    alignment/parser progress, timespec ranges, sigset size, and mmap arithmetic.
-7. Add phase-specific Specula execution, hash-bound gates, and candidate-only
+6. Add phase-specific Specula execution, hash-bound gates, and candidate-only
    result import in the model lane.
-8. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
+7. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
    only in the authorization-gated lab.
 
-For the next core slice, stop when one exact binary is exported with source,
-compiler, linker, command, and SHA-256 provenance and can be consumed without
-rebuilding by both runtime platforms. Linux execution and comparison are
-separate slices.
+For the next core slice, consume the exported descriptor and binary in one
+pinned Linux VM without rebuilding it. Comparison remains a separate slice.
