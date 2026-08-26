@@ -35,6 +35,28 @@ inventory --check: 250 syscalls, 0 errors
 targets check: 11 targets, 0 issues
 ```
 
+## Current CI and nightly baseline
+
+aster-syssec PR #6 merged as
+`b26364a64b9ee9009e4765981eb3aacefc9d40c5`. Its PR checks passed against
+head `51ab61366c43f060193d47452e7ef48e09871189`. Main push run `32936798988`
+then passed both `validate` and `host-verification` on the merge commit.
+
+Manual workflow run `32930891820` selected the `nightly` profile and executed
+all 11 targets against pinned Asterinas
+`d0bddbf56d893221d103a0c3330f379dc59977b9`. Every expected outcome was met;
+`failed_targets` was empty.
+
+The run's verified evidence pack contained 87 files and 1,173,048
+uncompressed bytes. GitHub stored it as a 142,523-byte artifact. The previous
+scheduled run `32880127358` uploaded 1,136,398,829 bytes and 99,903 ZIP entries
+because the whole work root included cache and build trees.
+
+The old scheduled run failed before artifact upload. `iovec-host-fuzz` returned
+`tool-error` because offline Cargo could not find `libfuzzer-sys` in a fresh
+runner cache; fail-fast then skipped Loom. Nightly now primes the locked fuzz
+dependencies before offline execution and reports the complete target matrix.
+
 ## v0.3 Host Verification baseline
 
 Observed on 2026-08-24 against clean revisions:
@@ -161,9 +183,14 @@ is not a finding.
 ## CI profiles
 
 Pull requests and pushes run five Kani targets, Miri, x86-64 layout, and the
-bounded Loom model. The scheduled nightly job runs all 11 targets, adding both
-other layouts and the 1000-run fuzz campaign. Both jobs upload the evidence
-root even after failure.
+bounded Loom model. Scheduled and manually dispatched nightly jobs run all 11
+targets, adding both other layouts and the 1000-run fuzz campaign. Nightly uses
+`fail_fast = false`.
+
+Host CI keeps cache and build trees outside the evidence root. It uploads only
+manifest-registered, hash-verified artifacts through `syssec evidence pack`.
+The pack fails above 50 MiB or 5,000 files and still accepts a failed run after
+revalidating its recorded artifacts.
 
 SMP regression, LTP, kselftest, gVisor, and the differential corpus remain
 explicit external requirements.
