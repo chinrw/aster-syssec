@@ -12,6 +12,7 @@
     "target_registry_hash",
     "command_results",
     "target_results",
+    "failed_targets",
     "external_required"
   ],
   "properties": {
@@ -43,7 +44,10 @@
           "result_id",
           "outcome",
           "expected",
-          "expectation_met"
+          "expectation_met",
+          "run_manifest",
+          "result_path",
+          "result_sha256"
         ],
         "properties": {
           "target": { "type": "string", "minLength": 1 },
@@ -51,9 +55,23 @@
           "result_id": { "type": "string", "pattern": "^RESULT-[0-9A-F]{16}$" },
           "outcome": { "type": "string", "minLength": 1 },
           "expected": { "type": "string", "minLength": 1 },
-          "expectation_met": { "type": "boolean" }
+          "expectation_met": { "type": "boolean" },
+          "run_manifest": { "const": "run-manifest.json" },
+          "result_path": {
+            "type": "string",
+            "pattern": "^engines/[a-z0-9-]+/[a-z0-9-]+/result\\.json$"
+          },
+          "result_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
         }
       }
+    },
+    "failed_targets": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
     },
     "external_required": {
       "type": "array",

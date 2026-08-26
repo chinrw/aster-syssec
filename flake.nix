@@ -235,8 +235,9 @@
             text = ''
               cache_root="''${XDG_CACHE_HOME:-$HOME/.cache}/aster-syssec"
               work_root="''${SYSSEC_WORK_ROOT:-$cache_root/work}"
-              export KANI_HOME="''${KANI_HOME:-$work_root/cache/kani}"
-              export RUSTUP_HOME="''${SYSSEC_KANI_RUSTUP_HOME:-$work_root/cache/kani-rustup}"
+              syssec_cache_root="''${SYSSEC_CACHE_ROOT:-$work_root/cache}"
+              export KANI_HOME="''${KANI_HOME:-$syssec_cache_root/kani}"
+              export RUSTUP_HOME="''${SYSSEC_KANI_RUSTUP_HOME:-$syssec_cache_root/kani-rustup}"
               mkdir -p "$KANI_HOME"
               mkdir -p "$RUSTUP_HOME"
               exec cargo-kani setup "$@"
@@ -297,8 +298,9 @@
           formalShellHook = commonShellHook + ''
             export ASTERINAS_RUST_TOOLCHAIN=${lib.escapeShellArg rustSpec.channel}
             export KANI_VERSION=${lib.escapeShellArg versions.kani}
-            export KANI_HOME="''${KANI_HOME:-$SYSSEC_WORK_ROOT/cache/kani}"
-            export RUSTUP_HOME="''${SYSSEC_KANI_RUSTUP_HOME:-$SYSSEC_WORK_ROOT/cache/kani-rustup}"
+            syssec_cache_root="''${SYSSEC_CACHE_ROOT:-$SYSSEC_WORK_ROOT/cache}"
+            export KANI_HOME="''${KANI_HOME:-$syssec_cache_root/kani}"
+            export RUSTUP_HOME="''${SYSSEC_KANI_RUSTUP_HOME:-$syssec_cache_root/kani-rustup}"
             export JAVA_HOME=${pkgs.jdk21_headless}
           '';
 

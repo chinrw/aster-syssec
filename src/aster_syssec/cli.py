@@ -18,6 +18,7 @@ from .config import (
 )
 from .doctor import run_doctor
 from .engines import EngineContext, doctor_engine, execute_target
+from .evidence import DEFAULT_MAX_BYTES, DEFAULT_MAX_FILES, pack_evidence
 from .handoff import verify_handoff
 from .inventory import InventoryBuilder, compare_baseline
 from .profile_commands import ProfileCommandContext, execute_profile_command
@@ -216,6 +217,20 @@ def build_parser() -> argparse.ArgumentParser:
     run_profile.add_argument("--baseline", type=Path)
     run_profile.add_argument("--json", action="store_true")
     run_profile.set_defaults(handler=_run_profile)
+
+    evidence = subparsers.add_parser(
+        "evidence", help="verify and package registered run evidence"
+    )
+    evidence_commands = evidence.add_subparsers(dest="evidence_command", required=True)
+    evidence_pack = evidence_commands.add_parser(
+        "pack", help="copy verified manifest artifacts into a bounded upload tree"
+    )
+    evidence_pack.add_argument("--work-root", required=True, type=Path)
+    evidence_pack.add_argument("--output", required=True, type=Path)
+    evidence_pack.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
+    evidence_pack.add_argument("--max-files", type=int, default=DEFAULT_MAX_FILES)
+    evidence_pack.add_argument("--json", action="store_true")
+    evidence_pack.set_defaults(handler=_evidence_pack)
 
     verify = subparsers.add_parser(
         "verify-handoff",
@@ -813,6 +828,8 @@ def _run_profile(args: argparse.Namespace) -> int:
                     run=run,
                 ),
             )
+            result_path = f"engines/{target.engine}/{target.id}/result.json"
+            result_artifact = run.artifact_record(result_path)
             target_results.append(
                 {
                     "target": target.id,
@@ -821,6 +838,9 @@ def _run_profile(args: argparse.Namespace) -> int:
                     "outcome": execution.outcome,
                     "expected": target.policy.expected,
                     "expectation_met": execution.expectation_met,
+                    "run_manifest": "run-manifest.json",
+                    "result_path": result_path,
+                    "result_sha256": result_artifact["sha256"],
                 }
             )
             if profile.fail_fast and not execution.expectation_met:
@@ -836,6 +856,9 @@ def _run_profile(args: argparse.Namespace) -> int:
             "target_registry_hash": targets.config_hash,
             "command_results": command_results,
             "target_results": target_results,
+            "failed_targets": [
+                item["target"] for item in target_results if not item["expectation_met"]
+            ],
             "external_required": list(profile.external_required),
         }
         run.write_json(
@@ -849,9 +872,49 @@ def _run_profile(args: argparse.Namespace) -> int:
     _print_result(
         args.json,
         summary,
-        f"run profile: {profile.id} status={result['status']}; run={run.root}",
+        _profile_summary_text(result, run.root),
     )
     return 0 if result["status"] == "pass" else 1
+
+
+def _profile_summary_text(result: dict[str, Any], run_root: Path) -> str:
+    lines = [
+        f"run profile: {result['profile']} status={result['status']}; run={run_root}"
+    ]
+    for command in result["command_results"]:
+        lines.append(f"command: {command['command']}; observed: {command['outcome']}")
+    for target in result["target_results"]:
+        lines.extend(
+            [
+                f"target: {target['target']}",
+                f"engine: {target['engine']}",
+                f"expected: {target['expected']}",
+                f"observed: {target['outcome']}",
+                f"result: {target['result_path']}",
+                f"result_sha256: {target['result_sha256']}",
+            ]
+        )
+    if result["failed_targets"]:
+        lines.append(f"failed targets: {', '.join(result['failed_targets'])}")
+    return "\n".join(lines)
+
+
+def _evidence_pack(args: argparse.Namespace) -> int:
+    result = pack_evidence(
+        args.work_root,
+        args.output,
+        max_bytes=args.max_bytes,
+        max_files=args.max_files,
+    )
+    _print_result(
+        args.json,
+        result,
+        "evidence pack: "
+        f"manifests={result['manifests']} files={result['files']} "
+        f"bytes={result['bytes']} sha256={result['content_sha256']}; "
+        f"output={result['output']}",
+    )
+    return 0
 
 
 def _verify_handoff(args: argparse.Namespace) -> int:

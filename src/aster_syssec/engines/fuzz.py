@@ -11,7 +11,7 @@ from pathlib import Path
 
 from ..engine_results import EngineExecution, evidence_id
 from ..targets import VerificationTarget
-from .base import EngineContext
+from .base import EngineContext, resolve_cache_root
 from .process import ProcessResult, run_process
 
 _DONE = re.compile(r"Done\s+(\d+)\s+runs", re.IGNORECASE)
@@ -54,17 +54,21 @@ def execute_fuzz(target: VerificationTarget, context: EngineContext) -> EngineEx
     temporary_root = context.run.root / "tmp"
     corpus_root = context.run.root / "corpus/fuzz" / target.id
     artifact_root = context.run.root / "crashes/fuzz" / target.id
-    persistent_corpus = context.work_root / "corpus/host" / target.id
+    cache_root = resolve_cache_root(context)
+    cargo_home = cache_root / "cargo"
+    persistent_corpus = cache_root / "corpus/host" / target.id
     for path in (
         build_root,
         temporary_root,
         corpus_root,
         artifact_root,
+        cargo_home,
         persistent_corpus,
     ):
         path.mkdir(parents=True, exist_ok=True)
     seed_count = _copy_corpus(persistent_corpus, corpus_root)
     isolated = {
+        "CARGO_HOME": str(cargo_home),
         "CARGO_TARGET_DIR": str(build_root),
         "CARGO_NET_OFFLINE": "true",
         "TMPDIR": str(temporary_root),
@@ -178,9 +182,10 @@ def execute_fuzz(target: VerificationTarget, context: EngineContext) -> EngineEx
     if sha256(fuzz_lock.read_bytes()).hexdigest() != lock_before:
         outcome = "tool-error"
         diagnostics.append("cargo-fuzz changed the checked-in lockfile copy")
-    context.run.register_artifact(corpus_root)
-    context.run.register_artifact(artifact_root)
-    context.run.register_artifact(fuzz_root)
+    crash_artifact: str | None = None
+    if crash_inputs:
+        context.run.register_artifact(artifact_root)
+        crash_artifact = artifact_root.relative_to(context.run.root).as_posix()
     _copy_corpus(corpus_root, persistent_corpus)
     corpus_count = sum(1 for path in corpus_root.iterdir() if path.is_file())
     result_seed = {
@@ -218,9 +223,9 @@ def execute_fuzz(target: VerificationTarget, context: EngineContext) -> EngineEx
         "artifacts": {
             "stdout": stdout_path.relative_to(context.run.root).as_posix(),
             "stderr": stderr_path.relative_to(context.run.root).as_posix(),
-            "corpus": corpus_root.relative_to(context.run.root).as_posix(),
-            "crashes": artifact_root.relative_to(context.run.root).as_posix(),
-            "fuzz_project": fuzz_root.relative_to(context.run.root).as_posix(),
+            "corpus": None,
+            "crashes": crash_artifact,
+            "fuzz_project": None,
         },
         "diagnostics": diagnostics,
         "engine_details": {

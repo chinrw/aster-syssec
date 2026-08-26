@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ..engine_results import EngineExecution, evidence_id
 from ..targets import VerificationTarget
-from .base import EngineContext
+from .base import EngineContext, resolve_cache_root
 from .process import ProcessResult, run_process
 
 _TEST_RESULT = re.compile(
@@ -44,7 +44,7 @@ def execute_miri(target: VerificationTarget, context: EngineContext) -> EngineEx
     prefix = f"engines/miri/{target.id}"
     build_root = context.run.root / "build/miri"
     temporary_root = context.run.root / "tmp"
-    cache_root = context.work_root / "cache/miri"
+    cache_root = resolve_cache_root(context) / "miri"
     for path in (build_root, temporary_root, cache_root):
         path.mkdir(parents=True, exist_ok=True)
     isolated = {

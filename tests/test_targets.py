@@ -45,6 +45,7 @@ class PackagedProfileTests(unittest.TestCase):
         self.assertNotIn("full Kani", nightly.external_required)
         self.assertNotIn("Miri host tests", nightly.external_required)
         self.assertNotIn("Loom models", nightly.external_required)
+        self.assertFalse(nightly.fail_fast)
 
 
 def write_kani_target(root: Path) -> Path:
@@ -410,9 +411,11 @@ echo "Complete - 1 successfully verified harnesses, 0 failures, 1 total."
             )
             cargo.chmod(0o755)
             work = base / "work"
+            cache = base / "job-cache"
             output = io.StringIO()
             environment = {
-                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "SYSSEC_CACHE_ROOT": str(cache),
             }
             with (
                 patch.dict(os.environ, environment, clear=False),
@@ -440,6 +443,13 @@ echo "Complete - 1 successfully verified harnesses, 0 failures, 1 total."
                     run_root / "engines/kani/iovec-entry-address-no-wrap/command.json"
                 ).read_text()
             )
+            environment_evidence = json.loads(
+                (
+                    run_root
+                    / "engines/kani/iovec-entry-address-no-wrap/environment.json"
+                ).read_text()
+            )
+            work_cache_created = (work / "cache").exists()
 
         self.assertEqual(status, 0)
         self.assertEqual(result["outcome"], "pass")
@@ -457,6 +467,15 @@ echo "Complete - 1 successfully verified harnesses, 0 failures, 1 total."
         self.assertIn(f"{prefix}/environment.json", outputs)
         self.assertIn("concrete-playback", command["argv"])
         self.assertNotIn("inplace", command["argv"])
+        self.assertEqual(
+            environment_evidence["variables"]["KANI_HOME"],
+            str(cache.resolve() / "kani"),
+        )
+        self.assertEqual(
+            environment_evidence["variables"]["RUSTUP_HOME"],
+            str(cache.resolve() / "kani-rustup"),
+        )
+        self.assertFalse(work_cache_created)
 
     def test_kani_counterexample_records_printed_concrete_playback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -605,9 +624,11 @@ echo "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out
             )
             cargo.chmod(0o755)
             work = base / "work"
+            cache = base / "job-cache"
             output = io.StringIO()
             environment = {
-                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "SYSSEC_CACHE_ROOT": str(cache),
             }
             with (
                 patch.dict(os.environ, environment, clear=False),
@@ -646,6 +667,10 @@ echo "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out
         self.assertIn(f"{prefix}/stderr.log", outputs)
         self.assertIn("CARGO_TARGET_DIR", environment_evidence["variables"])
         self.assertIn("XDG_CACHE_HOME", environment_evidence["variables"])
+        self.assertEqual(
+            environment_evidence["variables"]["XDG_CACHE_HOME"],
+            str(cache.resolve() / "miri"),
+        )
 
     def test_run_target_extracts_target_layout_from_an_object_section(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -737,6 +762,7 @@ Path(destination).write_bytes(struct.pack("<7Q", magic, 1, 64, 16, 8, 0, 8))
             result = json.loads(
                 (run_root / "engines/layout/user-iovec-x86-64/result.json").read_text()
             )
+            manifest = json.loads((run_root / "run-manifest.json").read_text())
 
         self.assertEqual(status, 0, result)
         self.assertEqual(summary["outcome"], "pass")
@@ -744,6 +770,13 @@ Path(destination).write_bytes(struct.pack("<7Q", magic, 1, 64, 16, 8, 0, 8))
         self.assertEqual(
             result["engine_details"]["layout"]["field_offsets"],
             {"base": 0, "len": 8},
+        )
+        self.assertIsNone(result["artifacts"]["object"])
+        self.assertIsNotNone(result["artifacts"]["section"])
+        self.assertFalse(
+            any(
+                item["path"].startswith("build/layout/") for item in manifest["outputs"]
+            )
         )
 
     def test_run_target_replays_a_bounded_host_fuzz_campaign(self) -> None:
@@ -781,9 +814,12 @@ echo "Done 100 runs in 0 second(s)"
             )
             cargo.chmod(0o755)
             work = base / "work"
+            cache = base / "job-cache"
             output = io.StringIO()
             environment = {
-                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"
+                "CARGO_HOME": str(cache / "cargo"),
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "SYSSEC_CACHE_ROOT": str(cache),
             }
             with (
                 patch.dict(os.environ, environment, clear=False),
@@ -808,11 +844,36 @@ echo "Done 100 runs in 0 second(s)"
             result = json.loads(
                 (run_root / "engines/fuzz/iovec-host-fuzz/result.json").read_text()
             )
+            manifest = json.loads((run_root / "run-manifest.json").read_text())
+            environment_evidence = json.loads(
+                (run_root / "engines/fuzz/iovec-host-fuzz/environment.json").read_text()
+            )
+            work_corpus_created = (work / "corpus").exists()
 
         self.assertEqual(status, 0, result)
         self.assertEqual(summary["outcome"], "pass")
         self.assertEqual(result["engine_details"]["completed_runs"], 100)
         self.assertEqual(result["engine_details"]["crash_inputs"], [])
+        self.assertIsNone(result["artifacts"]["fuzz_project"])
+        self.assertIsNone(result["artifacts"]["corpus"])
+        self.assertIsNone(result["artifacts"]["crashes"])
+        self.assertFalse(
+            any(
+                item["path"].startswith(
+                    ("inputs/fuzz/", "corpus/fuzz/", "crashes/fuzz/")
+                )
+                for item in manifest["outputs"]
+            )
+        )
+        self.assertEqual(
+            environment_evidence["variables"]["CARGO_HOME"],
+            str((cache / "cargo").resolve()),
+        )
+        self.assertIn(
+            str((cache / "corpus/host/iovec-host-fuzz").resolve()),
+            environment_evidence["writable_roots"],
+        )
+        self.assertFalse(work_corpus_created)
 
     def test_run_target_records_a_bounded_loom_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -985,6 +1046,135 @@ echo "Complete - 1 successfully verified harnesses, 0 failures, 1 total."
         self.assertEqual(
             profile_result["schema"],
             "https://asterinas.dev/syssec/profile-result.schema.json",
+        )
+
+    def test_non_fail_fast_profile_records_every_target_and_failed_target(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            source = write_fixture(base / "asterinas")
+            package = source / "kernel/libs/aster-uapi"
+            (package / "src").mkdir(parents=True)
+            (package / "Cargo.toml").write_text(
+                '[package]\nname = "aster-uapi"\nversion = "0.1.0"\n',
+                encoding="utf-8",
+            )
+            (package / "src/lib.rs").write_text(
+                """
+pub fn iovec_entry_addr() {}
+
+#[kani::proof]
+fn proof_iovec_entry_address_no_wrap() {
+    iovec_entry_addr();
+}
+
+#[kani::proof]
+fn proof_second_target() {
+    iovec_entry_addr();
+}
+""".lstrip(),
+                encoding="utf-8",
+            )
+            target_root = write_kani_target(base / "targets")
+            first_target = target_root / "kani/iovec-entry-address-no-wrap.toml"
+            second_target = target_root / "kani/iovec-second-proof.toml"
+            second_target.write_text(
+                first_target.read_text(encoding="utf-8")
+                .replace(
+                    'id = "iovec-entry-address-no-wrap"',
+                    'id = "iovec-second-proof"',
+                )
+                .replace(
+                    'harness = "proof_iovec_entry_address_no_wrap"',
+                    'harness = "proof_second_target"',
+                ),
+                encoding="utf-8",
+            )
+            profile_config = base / "profiles.toml"
+            profile_config.write_text(
+                """
+version = 1
+
+[profiles.nightly]
+implemented_commands = []
+targets = ["iovec-entry-address-no-wrap", "iovec-second-proof"]
+external_required = []
+fail_fast = false
+""".lstrip(),
+                encoding="utf-8",
+            )
+            fake_bin = base / "bin"
+            fake_bin.mkdir()
+            cargo = fake_bin / "cargo"
+            cargo.write_text(
+                """#!/bin/sh
+if [ "$1" = "kani" ] && [ "$2" = "--version" ]; then
+    echo "Kani 0.67.0"
+    exit 0
+fi
+case " $* " in
+  *" proof_iovec_entry_address_no_wrap "*)
+    echo "VERIFICATION:- FAILED"
+    echo "Complete - 0 successfully verified harnesses, 1 failures, 1 total."
+    exit 1
+    ;;
+esac
+echo "VERIFICATION:- SUCCESSFUL"
+echo "Complete - 1 successfully verified harnesses, 0 failures, 1 total."
+""",
+                encoding="utf-8",
+            )
+            cargo.chmod(0o755)
+            work = base / "work"
+            stdout = io.StringIO()
+            environment = {
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}"
+            }
+            with (
+                patch.dict(os.environ, environment, clear=False),
+                contextlib.redirect_stdout(stdout),
+            ):
+                status = main(
+                    [
+                        "run",
+                        "--profile",
+                        "nightly",
+                        "--profile-config",
+                        str(profile_config),
+                        "--asterinas",
+                        str(source),
+                        "--work-root",
+                        str(work),
+                        "--target-root",
+                        str(target_root),
+                    ]
+                )
+            console = stdout.getvalue()
+            result = json.loads(next(work.rglob("profile/result.json")).read_text())
+
+        self.assertEqual(status, 1)
+        self.assertEqual(result["status"], "fail")
+        self.assertEqual(len(result["target_results"]), 2)
+        self.assertEqual(
+            [item["outcome"] for item in result["target_results"]],
+            ["counterexample", "pass"],
+        )
+        self.assertEqual(result["failed_targets"], ["iovec-entry-address-no-wrap"])
+        self.assertEqual(
+            result["target_results"][0]["result_path"],
+            "engines/kani/iovec-entry-address-no-wrap/result.json",
+        )
+        self.assertEqual(
+            result["target_results"][0]["run_manifest"], "run-manifest.json"
+        )
+        self.assertEqual(len(result["target_results"][0]["result_sha256"]), 64)
+        self.assertIn("target: iovec-entry-address-no-wrap", console)
+        self.assertIn("engine: kani", console)
+        self.assertIn("expected: pass", console)
+        self.assertIn("observed: counterexample", console)
+        self.assertIn(
+            "result: engines/kani/iovec-entry-address-no-wrap/result.json", console
         )
 
     def test_run_profile_executes_implemented_config_check_command(self) -> None:

@@ -6,12 +6,22 @@ on:
     branches: [main]
   schedule:
     - cron: "23 17 * * *"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Verification profile
+        required: true
+        type: choice
+        options:
+          - pr
+          - nightly
+        default: pr
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ inputs.profile || 'auto' }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -47,6 +57,8 @@ jobs:
   host-verification:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      SYSSEC_PROFILE: ${{ github.event_name == 'schedule' && 'nightly' || github.event_name == 'workflow_dispatch' && inputs.profile || 'pr' }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -66,13 +78,27 @@ jobs:
 
       - name: Install the pinned Kani bundle
         env:
-          SYSSEC_WORK_ROOT: ${{ runner.temp }}/aster-syssec-host
+          SYSSEC_CACHE_ROOT: ${{ runner.temp }}/aster-syssec-host/cache
+          SYSSEC_JOB_ROOT: ${{ runner.temp }}/aster-syssec-host
+          SYSSEC_WORK_ROOT: ${{ runner.temp }}/aster-syssec-host/evidence
         run: nix develop .#formal --command syssec-kani-setup
+
+      - name: Prime locked fuzz dependencies
+        if: env.SYSSEC_PROFILE == 'nightly'
+        env:
+          CARGO_HOME: ${{ runner.temp }}/aster-syssec-host/cache/cargo
+          SYSSEC_CACHE_ROOT: ${{ runner.temp }}/aster-syssec-host/cache
+        run: |
+          nix develop .#formal --command cargo fetch \
+            --locked \
+            --manifest-path "$GITHUB_WORKSPACE/asterinas/kernel/libs/aster-uapi/fuzz/Cargo.toml" \
+            --target x86_64-unknown-linux-gnu
 
       - name: Run the host-verification profile
         env:
-          SYSSEC_PROFILE: ${{ github.event_name == 'schedule' && 'nightly' || 'pr' }}
-          SYSSEC_WORK_ROOT: ${{ runner.temp }}/aster-syssec-host
+          SYSSEC_CACHE_ROOT: ${{ runner.temp }}/aster-syssec-host/cache
+          SYSSEC_JOB_ROOT: ${{ runner.temp }}/aster-syssec-host
+          SYSSEC_WORK_ROOT: ${{ runner.temp }}/aster-syssec-host/evidence
         run: |
           args=()
           if [[ "$SYSSEC_PROFILE" == pr ]]; then
@@ -84,11 +110,26 @@ jobs:
             --profile "$SYSSEC_PROFILE" \
             "${args[@]}"
 
+      - name: Pack host-verification evidence
+        if: always()
+        env:
+          SYSSEC_JOB_ROOT: ${{ runner.temp }}/aster-syssec-host
+          SYSSEC_WORK_ROOT: ${{ runner.temp }}/aster-syssec-host/evidence
+          SYSSEC_UPLOAD_ROOT: ${{ runner.temp }}/aster-syssec-host/upload
+        run: |
+          nix develop .#default --command syssec evidence pack \
+            --work-root "$SYSSEC_WORK_ROOT" \
+            --output "$SYSSEC_UPLOAD_ROOT" \
+            --max-bytes 52428800 \
+            --max-files 5000
+
       - name: Upload host-verification evidence
         if: always()
+        env:
+          SYSSEC_UPLOAD_ROOT: ${{ runner.temp }}/aster-syssec-host/upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: aster-syssec-host-evidence
-          path: ${{ runner.temp }}/aster-syssec-host
-          if-no-files-found: warn
+          path: ${{ env.SYSSEC_UPLOAD_ROOT }}
+          if-no-files-found: error
           retention-days: 14

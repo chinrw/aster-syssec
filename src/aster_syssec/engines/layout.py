@@ -157,7 +157,6 @@ def execute_layout(
     outcome, diagnostics = _compile_outcome(compile_process)
     layout: dict[str, Any] | None = None
     matches_expected: bool | None = None
-    object_output: Path | None = None
     section_output: Path | None = None
     extract_stdout: Path | None = None
     extract_stderr: Path | None = None
@@ -171,7 +170,6 @@ def execute_layout(
                 f"layout compile produced {len(objects)} probe objects; expected one"
             )
         else:
-            object_output = context.run.register_artifact(objects[0])
             raw_section = context.run.root / prefix / "section.bin"
             raw_section.parent.mkdir(parents=True, exist_ok=True)
             extract_argv = [
@@ -258,7 +256,7 @@ def execute_layout(
             ),
         },
         "artifacts": {
-            "object": _relative(object_output, context.run.root),
+            "object": None,
             "section": _relative(section_output, context.run.root),
             "compile_stdout": compile_stdout.relative_to(context.run.root).as_posix(),
             "compile_stderr": compile_stderr.relative_to(context.run.root).as_posix(),
