@@ -16,8 +16,9 @@ git status --short --branch
 git rev-parse HEAD
 git log --oneline --decorate -12
 git diff --stat origin/main...HEAD
-gh pr view 2 --repo chinrw/aster-syssec
-gh pr view 3 --repo chinrw/aster-syssec
+gh pr view 6 --repo chinrw/aster-syssec
+gh pr view 5 --repo chinrw/asterinas
+gh run list --repo chinrw/aster-syssec --branch main --limit 5
 ```
 
 Re-run checks before claiming that a target, runtime case, or PR is current.
@@ -45,16 +46,22 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 
 | State | Revision | Scope |
 | --- | --- | --- |
-| merged `main` | `0c9a1da` | Host Verification baseline from PR #1 |
+| merged `main` | `b26364a` | PR #1-#6: Host Verification, Runtime Foundation, binary export, and bounded CI evidence |
 | signed tag `v0.3.0` | `421c9d9` | v0.3 Host Verification record |
-| open PR #2 | `6e35d0016344832b54c07641a62f1ebde13ba56b` | Runtime schemas and strict guest parser |
-| open PR #3 | `c11f7530d4f6c6a7094041e19fd59e95592d9970` | Asterinas QEMU adapter, stacked on PR #2 |
-| open PR #4 | `b745a346933abc2d7867656b1e9ebe8b29b27d80` | Current agent handoff, stacked on PR #3 |
-| open PR #5 | `ac21746131b73f4f901155614d0e415f953770a2` | Static-binary export and provenance, stacked on PR #4 |
 
-PR #2, PR #3, and PR #4 had successful `validate` and `host-verification`
-checks at this snapshot. PR #5 checks were running. Integrate them in stack
-order. None was merged.
+All six aster-syssec PRs are merged. PR #6 head
+`51ab61366c43f060193d47452e7ef48e09871189` passed `validate` and
+`host-verification`; merge commit `b26364a64b9ee9009e4765981eb3aacefc9d40c5`
+is the current public baseline.
+
+Main push run `32936798988` completed successfully on that merge commit. Both
+`validate` and the PR-profile `host-verification` job passed.
+
+Manual workflow run `32930891820` executed the `nightly` profile on the PR #6
+head. All 11 targets passed and `failed_targets` was empty. Its verified pack
+contained 87 files and 1,173,048 uncompressed bytes; the uploaded GitHub
+artifact was 142,523 bytes. The previous scheduled artifact was
+1,136,398,829 bytes because it included cache and build trees.
 
 The package version remains `0.3.0`. Runtime work has not changed the release
 tag.
@@ -76,10 +83,11 @@ The three persistent Asterinas seam PRs are merged in `chinrw/asterinas`:
 | #3 `syssec-fd-protocol` | `5eb921ef74cbd397118270c2e27b38bac4103ff8` | reserved FD protocol and Loom model |
 | #4 `syssec-runtime-harness` | `da81ae952e245b6bb60229457f090575c4fe97f6` | isolated guest case runner and partial-EFAULT case |
 
-`chinrw/asterinas` PR #5 adds target-specific static linking for
-`partial_efault_json`. Its signed head is
+`chinrw/asterinas` PR #5 is the remaining owner action. It adds target-specific
+static linking for `partial_efault_json`. Its signed head is
 `d0bddbf56d893221d103a0c3330f379dc59977b9`; the aster-syssec flake pins this
 revision so the exporter cannot silently consume the earlier dynamic binary.
+At this snapshot the PR is clean, mergeable, and all reported checks pass.
 
 The previous v0.3 pin was the runtime-harness content commit. The current pin
 descends from the merged seam stack and adds only target-specific static linking
@@ -97,6 +105,7 @@ Asterinas source (read-only, exact revision)
   |
   +-- target registry --> checkout preflight --> engine adapter
   |                                           --> normalized result
+  |                                           --> verified evidence pack
   |
   +-- agent/specula preparation --> hash-bound handoff script
   |
@@ -246,13 +255,18 @@ layout, the pure iovec helper fuzz surface, and FD reservation visibility.
 Stable expected results are in `docs/v0.3-host-results.json`.
 
 PR and push CI run five Kani proofs, Miri, x86-64 layout, and Loom. Scheduled
-nightly CI adds both other layouts and the 1000-run fuzz target. SMP regression,
-LTP, kselftest, gVisor, and the differential corpus remain explicit external
-requirements.
+or explicitly dispatched nightly CI adds both other layouts and the 1000-run
+fuzz target. Nightly primes the locked fuzz dependencies, then runs offline.
+It does not stop after the first target failure.
+
+CI separates cache, build, and evidence roots. `syssec evidence pack` verifies
+every completed or failed run manifest, copies only registered artifacts, and
+enforces 50 MiB and 5,000-file upload limits. SMP regression, LTP, kselftest,
+gVisor, and the differential corpus remain explicit external requirements.
 
 ## Implemented Runtime Foundation
 
-PR #2 defines six schemas:
+Merged PR #2 defines six schemas:
 
 - runtime target;
 - runtime request;
@@ -264,7 +278,7 @@ PR #2 defines six schemas:
 The oracle image and comparison schemas are contracts only. No Linux image
 builder, Linux QEMU adapter, or comparator producer exists.
 
-PR #3 implements the Asterinas adapter. It:
+Merged PR #3 implements the Asterinas adapter. It:
 
 - validates a self-contained request and exact clean source identity;
 - requires source and evidence roots to be disjoint;
@@ -327,9 +341,9 @@ hashed artifacts.
 Host Verification was executed on clean aster-syssec `5f8f38c` and Asterinas
 `490960ace`. `VALIDATION.md` records the environment and result bounds.
 
-The current Runtime Foundation tree passed the locked package gate with 95 tests,
-Ruff, formatting, Pyright, schema validation, Actionlint, and ShellCheck. PR #3
-passed both remote CI jobs.
+The PR #6 tree passed the locked package gate with 105 tests, Ruff, formatting,
+Pyright, schema validation, Actionlint, and ShellCheck. PR #6 and its manual
+nightly run passed both remote CI jobs.
 
 One offline, network-disabled TCG smoke ran against Asterinas
 `da81ae952e245b6bb60229457f090575c4fe97f6`. It completed in 131.5 seconds and
@@ -423,6 +437,7 @@ the work root below source or source below the work root.
 | add a static rule | `docs/static-rules.md`, `scanner.py`, `selection.py` | reachable and selected-scope semantics are tested separately |
 | add a Host target | `verification-target.schema.json`, sibling target TOML, matching engine | source symbol preflight fails red; exact production harness then passes |
 | change evidence lifecycle | `docs/reviewer-contract.md`, `runs.py`, relevant schemas | source/artifact mutation is detected before completion and report consumption |
+| change CI evidence packing | `evidence.py`, `evidence-pack.schema.json`, workflow tests | only verified manifest entries are copied and byte/file budgets fail closed |
 | change guest parsing | `runtime/protocol.py`, parser tests, guest schema | every stable error code and size/encoding boundary remains covered |
 | change QEMU supervision | `runtime/asterinas.py`, adapter tests, runtime-result schema | every outcome is distinguishable through `execute()` and no child process survives |
 | change binary export | `runtime/binary.py`, binary schemas, Asterinas initramfs build path | exported bytes equal the Nix output; provenance binds source, toolchain, command, and static ELF evidence |
@@ -432,9 +447,9 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Integrate aster-syssec PR #2 through PR #5 without flattening their review
-   boundaries.
-2. Add pinned Linux oracle metadata and a Linux QEMU adapter using the exported
+1. Merge `chinrw/asterinas` PR #5 and verify that
+   `d0bddbf56d893221d103a0c3330f379dc59977b9` is reachable from its `main`.
+2. Add a Linux QEMU adapter using pinned oracle metadata and the exported
    binary without rebuilding it.
 3. Implement the partial-EFAULT field relation and comparison producer.
 4. Register runtime targets and expose execution through an explicit CLI/profile.

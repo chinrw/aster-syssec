@@ -29,7 +29,9 @@ Version 0.3 implements:
 - bounded CI profile orchestration with per-command and per-target policy;
 - strict runtime evidence schemas and marker-delimited guest result parsing;
 - isolated Asterinas QEMU execution with normalized runtime results;
-- exact initramfs static-binary export with Nix, compiler, and linker provenance.
+- exact initramfs static-binary export with Nix, compiler, and linker provenance;
+- verified evidence packing with explicit byte and file budgets;
+- manually selectable PR and nightly CI profiles with per-target summaries.
 
 The bundled vertical slice contains five Kani proofs, one Miri test, three
 bare-metal layout targets, one cargo-fuzz target, and one Loom model. These
