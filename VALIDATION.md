@@ -44,8 +44,24 @@ and `nightly-2026-07-21` Rust-library inputs. Their hashes remain
 `sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=`. The locked flake gate
 passed with 161 tests, both packages, the Lab boundary, schema and workflow
 checks, Ruff, formatting, Pyright, Actionlint, and ShellCheck. The Runtime
-workflow now selects the same Asterinas commit; the current real dual-VM result
-below remains the previous pin until the remote Runtime baseline is rerun.
+workflow selects the same Asterinas commit.
+
+Asterinas PR #8 passed all 42 reported checks and merged as
+`d94f69ac8aa62c3b44ee1fc161c6419d6c655b74`; content commit `974e1bad...`
+is an ancestor of its public `main`. aster-syssec PR #19 passed both jobs and
+merged as `c344f8323db7241ea1a3f412a9ee148426b9cc8f`. Main push run
+`33065312608` then passed `host-verification` and `validate`.
+
+Manual main run `33066250182` executed the complete 19-target nightly profile.
+Both jobs passed and `failed_targets` was empty. The remote profile result
+SHA-256 is
+`4c7e89d80b0aad21f1c5765ee8e88c03e25dddd5434c8f6e94507be1a30585e2`.
+Artifact `9643932986` has archive digest
+`sha256:05ab9198fdb1d797ec2a704f6549e451872844d0d723e611d6cc32730acddefc`
+and compressed size 192,236 bytes. The downloaded pack contained 135 files and
+1,389,410 bytes. Every listed file SHA-256 and size matched; the independently
+recomputed content SHA-256 matched
+`f0fd6aefcb1e15cacaa83dc9c5e0cf592fccadabc1d67d63c957ef24387d2260`.
 
 ## Post-v0.4 control-message Host extension
 
@@ -83,24 +99,24 @@ and compressed size 172,748 bytes. The downloaded pack contained 117 files and
 recomputed content SHA-256 matched
 `04204dcfa82dad651b58e9caa9ba9c42d0698ca05e097112d000bcc556ad9759`.
 
-Both fixed-output vendor derivations rebuilt at their existing hashes. The
-Runtime workflow selects the same Asterinas commit. Main run `33055916200`
-then produced the current real dual-VM baseline below.
+Both fixed-output vendor derivations rebuilt at their existing hashes.
+Historical main run `33055916200` produced the control-message dual-VM
+baseline that the current baseline below supersedes.
 
 ## Current runtime baseline
 
-Workflow run `33055916200` completed successfully on aster-syssec
-`4af32509539a4f4604ec5cc30bc1d2a4535c7f1c` and Asterinas
-`5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb`. Pipeline
-`RUNTIME-PIPELINE-2AAC2AB2DD4DB13A` passed export, Asterinas, Linux, and
+Workflow run `33066252308` completed successfully on aster-syssec
+`c344f8323db7241ea1a3f412a9ee148426b9cc8f` and Asterinas
+`974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8`. Pipeline
+`RUNTIME-PIPELINE-0304FD0DA7CE9812` passed export, Asterinas, Linux, and
 comparison. Both guests returned normal results for binary SHA-256
 `696ed3ef05cda1b7d8e5f9b45bd1706ae4eef186736f028641fdf17e09cc7089`.
 
-Comparison `ORACLE-COMPARISON-6E7E057406AE0C1A` matched all seven declared
+Comparison `ORACLE-COMPARISON-145A977B01CEA804` matched all seven declared
 fields and retained `disposition=baseline`. The Runtime and evidence-pack
 steps contained zero download or Nix-store copy records. The independently
-verified pack contained 32 files and 16,524,561 bytes with content SHA-256
-`ea67f513a13ca36de0c754e75e57ed433feca815d2fd81223ecc32c0c196f542`.
+verified pack contained 32 files and 16,524,605 bytes with content SHA-256
+`42ef5822be32e1446fc777f86fedd4d45c94a10e145192cf6ef14bea5022d377`.
 Exact input, stage, result, archive, and provenance identities are recorded in
 `docs/runtime-baseline-2026-08-27.md`.
 

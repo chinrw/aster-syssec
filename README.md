@@ -66,7 +66,7 @@ validates authorization documents and reports the Lab boundary; it cannot
 execute a Lab case.
 
 The default flake input reads the Rust channel, components, and targets from
-Asterinas revision `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb`. Override it
+Asterinas revision `974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8`. Override it
 when reviewing another checkout:
 
 ```sh
