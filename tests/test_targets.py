@@ -38,10 +38,12 @@ class PackagedProfileTests(unittest.TestCase):
                 "message-iovec-count-limit",
                 "timespec-nonnegative-seconds",
                 "timespec-normalized-nanoseconds",
+                "sigset-exact-size",
                 "user-iovec-layout",
                 "control-message-header-layout",
                 "user-message-header-layout",
                 "user-timespec-layout",
+                "user-sigset-layout",
                 "user-iovec-x86-64",
                 "fd-reservation-visibility",
             ),
@@ -313,7 +315,7 @@ class TargetCliTests(unittest.TestCase):
     ) -> None:
         targets = load_target_registry(load_registry())
 
-        self.assertEqual(len(targets.targets), 22)
+        self.assertEqual(len(targets.targets), 24)
         self.assertEqual(
             {target.engine for target in targets.targets.values()},
             {"fuzz", "kani", "layout", "loom", "miri"},

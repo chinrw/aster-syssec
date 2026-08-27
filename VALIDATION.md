@@ -130,6 +130,52 @@ and compressed size 213,052 bytes. The downloaded pack contained 153 files and
 recomputed content SHA-256 matched
 `46f18e7e9d7228684981bd6b6b02fcda76206341a3d0645219fcfe093b65240c`.
 
+## Post-v0.4 signal-set Host extension
+
+Asterinas commit `0bc8839d496f185dd7662c79d53e98619bf1169c` moves the
+Linux userspace signal-set layout and exact-size validation into the
+production `aster-uapi` seam. `aster-core` retains user memory access, optional
+mask handling, signal semantics, and errno mapping. The flake pins that commit
+with NAR hash
+`sha256-4DljZtGrzNVVSprBN3yC5mqFe/+2N5VE18m2WAKCyQ4=`.
+
+The Host registry now contains 24 core targets: thirteen Kani proofs, five
+Miri tests, three bare-metal layout targets, two bounded fuzz targets, and one
+Loom model. Checkout preflight against the preceding public Asterinas main
+commit failed closed with eight missing-symbol or missing-harness issues.
+Preflight against `0bc8839d...` reported 24 targets and zero issues, with
+registry hash
+`b8c74515ac08f96958d161530e4ae17dbfd93166fd697de076bfb2491f9f6e3e`.
+
+Both local profiles passed against the clean Asterinas commit:
+
+- `pr`: three reviewer commands and all 20 blocking targets passed; result
+  SHA-256 `63bf9f3da743171ec5755338eaabe6679b9d0dddf1144a12e5dd8048f39496aa`;
+- `nightly`: two reviewer commands and all 24 targets passed; result SHA-256
+  `9253b1b8e376211de959623521e12705a917820ea6072608b6f7cb36a8dd14f4`.
+
+The new Kani proof covers the Linux exact-size signal-set contract. The Miri
+test covers the userspace signal-set layout. Native x86-64, LoongArch64, and
+RISC-V bare-metal checks passed. The verified nightly evidence pack retained
+165 files and 1,576,941 bytes with content SHA-256
+`c98110a83c028f0b32950f295f1051fab51456c69c3a89c500803acf5947c902`.
+
+The combined vendor rebuilt offline at the unchanged fixed hashes:
+
+- Asterinas workspace:
+  `sha256-BCSyswj+Q1wm6M/XthjZfgjj43tAtmRvhCD4V0ygjCc=`;
+- Rust `nightly-2026-07-21` `library/Cargo.lock`:
+  `sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=`.
+
+The locked flake gate passed with 161 tests, both packages, the Lab boundary,
+the initramfs packer contract, Ruff, formatting, Pyright, JSON Schema
+validation, Actionlint, and ShellCheck.
+
+Nix may fetch the public dependencies named by those lockfiles while
+materializing the fixed-output vendors. Host target execution, the Runtime
+container, and both Asterinas and Linux QEMU guests remain network-off. A fresh
+dual-VM baseline is deferred until the new Asterinas pin is merged.
+
 ## Post-v0.4 control-message Host extension
 
 Asterinas commit `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb` moves the
