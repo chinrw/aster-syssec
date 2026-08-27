@@ -194,6 +194,72 @@ symlinks or unexpected files, and the independently recomputed content
 SHA-256 matched
 `516d0f005c89a0eac168b23f38ecb5680678a66f93d5c4e554c0d4ad30219e97`.
 
+## Post-v0.4 mmap and mremap Host extension
+
+Asterinas commits `525328ea475defedb88421f06c992ffd8c1dc873` and
+`41eac1dc153196882beaf42472879ded679fcddc` add checked page alignment and
+half-open address-range arithmetic to the production `aster-uapi` seam, then
+use it to validate `mmap` and `mremap` inputs before VMAR mutation. The flake
+pins the content head with NAR hash
+`sha256-fbSXSPJoCNSloMzlUBTiy7dgkyPiDzVSo5vNCzcAFxE=`.
+
+The Host registry contains 27 core targets: sixteen Kani proofs, five Miri
+tests, three bare-metal layout targets, two bounded fuzz targets, and one Loom
+model. Checkout preflight against the preceding public Asterinas main failed
+closed with seven missing-symbol or missing-harness issues. Preflight against
+`41eac1dc...` reported 27 targets and zero issues, with registry hash
+`f112c5c9d421a667869668596b8eaebdc4302977aa51db487ecaf0cdb5f5c8d5`.
+
+Both local profiles passed against the clean content commit:
+
+- `pr`: three reviewer commands and all 23 blocking targets passed; result
+  SHA-256 `931b45cd08adfb06f94bdfd9d4960038384ced0d90568be7ee780a1dd668901e`;
+- `nightly`: two reviewer commands and all 27 targets passed; result SHA-256
+  `2713dff70c72610a9af9aaedd087309ec68b37f4dcaa606f7fa016231b7ac09a`.
+
+The three new Kani harnesses prove that page alignment cannot wrap, a checked
+range preserves its requested length and upper bound, and touching half-open
+ranges do not overlap. Replacing checked addition with wrapping addition,
+removing the end-limit check, or treating touching ranges as overlapping made
+the corresponding proof fail. `aster-uapi` passed 21 unit tests and no-std
+checks for x86-64, RISC-V 64, and LoongArch 64. The changed Asterinas core
+passed its x86-64 check and Clippy. The regression package built, and the new
+overlap-before-resize and page-aligned `MREMAP_DONTUNMAP` cases passed on
+Linux. The two-profile evidence pack retained 334 files and 2,894,677 bytes
+with content SHA-256
+`7616dd19f83f53e8484795eac1e7ada42924d7500feefa7bb89eba530071cf96`.
+
+Nix materialized the combined vendor for the new source pin. It may fetch the
+public dependencies named by the Asterinas workspace lock and the
+`nightly-2026-07-21` `library/Cargo.lock` during this fixed-output step. The
+Rust lockfile SHA-256 is
+`9e87d1ac04edbf5fa61e27cb21984a83566573a007767713868965fba70acb6d`.
+The fixed vendor hashes remain:
+
+- Asterinas workspace:
+  `sha256-BCSyswj+Q1wm6M/XthjZfgjj43tAtmRvhCD4V0ygjCc=`;
+- pinned Rust library:
+  `sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=`.
+
+An offline rebuild returned the same combined vendor at
+`/nix/store/g35flc5riy2clg1d5l8r3dg0pan7m5dq-asterinas-cargo-vendor-41eac1dc1531-vendor`;
+its NAR hash is
+`sha256-qi+MIWAY7SJMdaf6X3OVOvnt7rvyckrcpi1TzUl2/cc=` and the tree is read-only.
+
+The locked flake gate passed with 161 tests, both packages, the Lab boundary,
+the Linux oracle bundle, the pinned toolchain contract, Kani installer, and
+syzkaller checks, plus Ruff, formatting, Pyright, JSON Schema, Actionlint, and
+ShellCheck.
+
+Kani, Miri, layout, and Loom used the read-only vendor; fuzz used its
+prepopulated isolated cache. Cargo remained offline for every Host target.
+Runtime execution remains in the network-disabled container, with host
+forwarding disabled for Asterinas and `-nic none` for Linux. Asterinas PR #15
+passed all 42 reported checks and merged as
+`a516d1eb40c2e73563d4680e3251cdbdb95824dc`; content commit `41eac1dc...`
+is an ancestor of public `main`. The corresponding aster-syssec remote CI
+receipts are pending.
+
 ## Post-v0.4 control-message Host extension
 
 Asterinas commit `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb` moves the
