@@ -173,8 +173,26 @@ validation, Actionlint, and ShellCheck.
 
 Nix may fetch the public dependencies named by those lockfiles while
 materializing the fixed-output vendors. Host target execution, the Runtime
-container, and both Asterinas and Linux QEMU guests remain network-off. A fresh
-dual-VM baseline is deferred until the new Asterinas pin is merged.
+container, and both Asterinas and Linux QEMU guests remain network-off.
+
+Asterinas PR #14's original head passed all 42 reported checks and merged as
+`a20a44592fbd6e6efdf92af486873cb6f4c83bc5`; content commit `0bc8839d...`
+is an ancestor of its public `main`. aster-syssec PR #23 run `33084600540`
+passed both jobs and merged as
+`58b07bf1dd724636e0af35c226bc2f2c94d4bf2a`. Main push run `33087541192`
+then passed `validate` and the 20-target PR profile.
+
+Manual main run `33088274665` executed the complete 24-target nightly profile.
+Both jobs passed and `failed_targets` was empty. The remote profile result
+SHA-256 is
+`0152f0d279255f258d83ef42697852b008c9640da09acc84fba0004ed8c681f5`.
+Artifact `9653324612` has archive digest
+`sha256:7e49f6e9bd1185ec01b9596053cb637cc7f4314ff3e8e026b0a9b7f3d8fe0168`
+and compressed size 224,384 bytes. The downloaded pack contained 165 files and
+1,577,150 bytes. Every listed file SHA-256 and size matched; there were no
+symlinks or unexpected files, and the independently recomputed content
+SHA-256 matched
+`516d0f005c89a0eac168b23f38ecb5680678a66f93d5c4e554c0d4ad30219e97`.
 
 ## Post-v0.4 control-message Host extension
 
@@ -218,18 +236,18 @@ baseline that the current baseline below supersedes.
 
 ## Current runtime baseline
 
-Workflow run `33075155261` completed successfully on aster-syssec
-`70b3103dba44f00e74fb3bdf5baf153d03e56055` and Asterinas
-`820ec6464809071779f3c386634befcc83da10bc`. Pipeline
-`RUNTIME-PIPELINE-6CDABEF04FBB6E5C` passed export, Asterinas, Linux, and
+Workflow run `33088278826` completed successfully on aster-syssec
+`58b07bf1dd724636e0af35c226bc2f2c94d4bf2a` and Asterinas
+`0bc8839d496f185dd7662c79d53e98619bf1169c`. Pipeline
+`RUNTIME-PIPELINE-F08C97F40D002CAB` passed export, Asterinas, Linux, and
 comparison. Both guests returned normal results for binary SHA-256
 `696ed3ef05cda1b7d8e5f9b45bd1706ae4eef186736f028641fdf17e09cc7089`.
 
-Comparison `ORACLE-COMPARISON-F4A8F607F68060FB` matched all seven declared
+Comparison `ORACLE-COMPARISON-EBE6A95D8F953B78` matched all seven declared
 fields and retained `disposition=baseline`. The Runtime and evidence-pack
 steps contained zero download or Nix-store copy records. The independently
-verified pack contained 32 files and 16,524,703 bytes with content SHA-256
-`b2d2504dc68e1912351370dcfc8a626892cd6efa266e007e28dab08979c8ab65`.
+verified pack contained 32 files and 16,524,597 bytes with content SHA-256
+`b6420d3a4757349de0bcde9e75e06c3c3f9ac02c7879ccb93b3e78272f2d8890`.
 Exact input, stage, result, archive, and provenance identities are recorded in
 `docs/runtime-baseline-2026-08-27.md`.
 
