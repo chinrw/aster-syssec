@@ -115,6 +115,26 @@ class RunContext:
         self._register(resolved, media_type=media_type or _media_type(resolved))
         return resolved
 
+    def register_json_artifact(self, path: Path, *, schema: str) -> Path:
+        self._require_running()
+        resolved = Path(path).resolve()
+        self._relative_output(resolved)
+        try:
+            value = json.loads(resolved.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                f"external JSON artifact is invalid: {resolved}"
+            ) from error
+        document = validate_instance(value, schema)
+        self._register(
+            resolved,
+            media_type="application/json",
+            schema_name=document.name,
+            schema_id=document.id,
+            schema_sha256=document.sha256,
+        )
+        return resolved
+
     def artifact_record(self, relative: str) -> dict[str, Any]:
         self._require_running()
         normalized = self._relative_output(self._output_path(relative))

@@ -99,6 +99,40 @@ the boundary package. It does not execute a Lab case. The locked flake gate
 passed with 145 tests, the Lab package and boundary contract, Ruff, formatting,
 Pyright, JSON Schema validation, Actionlint, and ShellCheck.
 
+## Runtime target pipeline validation
+
+The explicit `partial-efault-baseline` profile was executed on 2026-08-27
+against clean Asterinas revision
+`d0bddbf56d893221d103a0c3330f379dc59977b9` and pinned oracle
+`linux-x86-64-6-18-45`. Runtime target checkout preflight reported one target,
+zero issues, and registry hash
+`62fb3df191be6b81eca1251a7215f9015ed27108b928abea115fbc9d16b76494`.
+
+Pipeline `RUNTIME-PIPELINE-AAE838C5F22FF91A` retained four schema-bound stages:
+
+| Stage | Result SHA-256 |
+| --- | --- |
+| export-binary | `94b4a9bb76fd69133a9eb865cb350833275e01c9427983b5700860bd40e071d3` |
+| run-asterinas | `6b0d7a5811f46d7d04c19f0c713eb2b61502d98277756b503588d655a2e1ee57` |
+| run-linux | `0ec22a0ba7b142a8aa9b16b4dbb7ddbe992905bfabd825bef164e48fdfc9e86b` |
+| compare | `386cfed29e6940809273a07b6615159c3cfd571f4e8fa0374f622235907e085b` |
+
+Both VM stages consumed binary SHA-256
+`696ed3ef05cda1b7d8e5f9b45bd1706ae4eef186736f028641fdf17e09cc7089`.
+Asterinas produced `RUNTIME-RESULT-DF09262766E6DFF6`; Linux produced
+`RUNTIME-RESULT-92FEA0C5BEBF956D`. Comparator
+`ORACLE-COMPARISON-FC6D76B2585101B9` matched all seven fields and retained
+`disposition=baseline`.
+
+The completed run directory occupied 3.4 GiB because it contained the isolated
+Asterinas checkout and build tree. `syssec evidence pack` verified the manifest
+and retained only 32 files totaling 16,298,975 bytes. The upload tree remained
+below the 50 MiB and 5,000-file limits.
+
+The final tree passed the locked flake gate with 154 tests, the Lab package and
+boundary contract, the initramfs packer contract, Ruff, formatting, Pyright,
+JSON Schema validation, Actionlint, and ShellCheck.
+
 ## v0.3 Host Verification baseline
 
 Observed on 2026-08-24 against clean revisions:

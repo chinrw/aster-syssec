@@ -59,6 +59,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "build_timeout_seconds",
         "boot_timeout_seconds",
         "test_timeout_seconds",
         "output_bytes",
@@ -66,6 +67,7 @@
         "smp"
       ],
       "properties": {
+        "build_timeout_seconds": { "type": "integer", "minimum": 1 },
         "boot_timeout_seconds": { "type": "integer", "minimum": 1 },
         "test_timeout_seconds": { "type": "integer", "minimum": 1 },
         "output_bytes": { "type": "integer", "minimum": 1024 },
