@@ -1,5 +1,17 @@
 # Validation
 
+## v0.4.0 release candidate
+
+The release branch synchronizes the main package, Lab package, Lab dependency,
+flake packages, and runtime `__version__` at `0.4.0`. The tag remains absent
+until the release PR and required checks pass. `docs/v0.4-release.md` records
+the release scope and explicit deferred work.
+
+The locked flake gate passed with 160 tests, both `0.4.0` package builds, the
+Lab boundary and packer shell contracts, Ruff, formatting, Pyright, JSON Schema
+validation, Actionlint, and ShellCheck. `nix run . -- --version` and
+`nix run .#syssec-lab -- --version` both reported `0.4.0`.
+
 ## Current runtime baseline
 
 The 2026-08-26 baseline pins Asterinas
@@ -192,9 +204,20 @@ independently recomputed and matched the index.
 
 The successful run resolved one additional Nix store path when entering the
 formal dev shell, before `syssec` started. The Runtime container and both QEMU
-guests remained network-off. The `runtime-offline-boundary` follow-up moves dev
-shell materialization into input resolution and invokes Nix with `--offline`
-during Runtime execution and evidence packing.
+guests remained network-off. PR #14 moved dev shell materialization into input
+resolution and made Nix Runtime and evidence invocations explicitly offline.
+
+PR #14 merged as `bfcc09d6a32b42d688d74bfbf9b61494290cff46`. Final
+`main` run `33048842078` passed in 12 minutes 1 second. All Nix cache downloads
+were confined to input resolution; no `copying path` event occurred during the
+Runtime or evidence steps. Pipeline `RUNTIME-PIPELINE-C10BE1B2CD6BAB1E`, both
+normal VM results, and comparison `ORACLE-COMPARISON-25B3516F3DEB8BEA` bound
+the same static binary and matched all seven fields.
+
+Artifact `9637034442` retained 32 files and 16,524,483 bytes with aggregate
+content SHA-256
+`d48347099ecbc4a1f2928ae3d6e60fa388f08ff928f47fa60dbc42967583b3da`.
+Every registered file hash and the aggregate hash matched after download.
 
 ## v0.3 Host Verification baseline
 

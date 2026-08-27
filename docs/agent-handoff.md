@@ -46,10 +46,10 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 
 | State | Revision | Scope |
 | --- | --- | --- |
-| merged `main` | `892d700` | PR #1-#13: Host Verification, Runtime Foundation, Linux differential baseline, safety boundaries, Runtime pipeline, and manual/weekly Runtime CI |
+| merged `main` | `bfcc09d` | PR #1-#14: Host Verification, Runtime Foundation, Linux differential baseline, safety boundaries, Runtime CI, and its offline execution boundary |
 | signed tag `v0.3.0` | `421c9d9` | v0.3 Host Verification record |
 
-All thirteen aster-syssec PRs are merged. PR #9 head
+All fourteen aster-syssec PRs are merged. PR #9 head
 `c47ac40e3ae27c4575a539bc6a3a2bbed41518c6` passed `validate` and
 `host-verification`; merge commit `f2f431c47430b308bfec406a54b745fdb89d712b`
 is the first real differential baseline. Later merged heads are:
@@ -60,8 +60,9 @@ is the first real differential baseline. Later merged heads are:
 | #11 | `fdeb807` | fail-closed core/model/lab target boundaries |
 | #12 | `5e64af9` | explicit four-stage Runtime target pipeline |
 | #13 | `51f4b96` | pinned manual/weekly Runtime workflow and networkless build wrapper |
+| #14 | `bf4cdd4` | fail-closed offline Nix boundary for Runtime and evidence execution |
 
-Merge commit `892d700f0bcb495498ece1213f0cc9b8a598ee55` is the current public
+Merge commit `bfcc09d6a32b42d688d74bfbf9b61494290cff46` is the current public
 baseline.
 
 Main push run `32953069193` completed successfully on historical merge commit
@@ -73,8 +74,9 @@ The bounded evidence pack remains enabled; the earlier manual validation of
 that pack contained 87 files and 1,173,048 uncompressed bytes, compared with
 the pre-fix 1,136,398,829-byte artifact that included cache and build trees.
 
-The package version remains `0.3.0`. Runtime work has not changed the release
-tag.
+The `release-v0.4.0` branch synchronizes both packages and the runtime version
+at `0.4.0`. Do not claim the `v0.4.0` tag until the release PR is merged and the
+signed tag is pushed. The historical `v0.3.0` tag remains unchanged.
 
 ### Pinned Asterinas
 
@@ -350,11 +352,10 @@ device mounts. The workflow uploads only a verified 50 MiB/5,000-file evidence
 pack.
 
 The first successful `main` run fetched one Nix store path while entering the
-formal dev shell, before `syssec` started. The `runtime-offline-boundary`
-follow-up materializes both dev shells during input resolution and passes
-`--offline` to Nix during Runtime and evidence steps. Keep that distinction
-explicit: Nix may fetch hash-pinned inputs during resolution; the execution
-boundary must fail rather than fetch.
+formal dev shell, before `syssec` started. Merged PR #14 now materializes both
+dev shells during input resolution and passes `--offline` to Nix during Runtime
+and evidence steps. Keep that distinction explicit: Nix may fetch hash-pinned
+inputs during resolution; the execution boundary must fail rather than fetch.
 
 The Linux adapter seam is:
 
@@ -428,6 +429,17 @@ and comparison `ORACLE-COMPARISON-DC078CD0DA73B598` bound the same
 retained 32 files and 16,524,759 bytes. Every downloaded file hash and aggregate
 content hash `959ad3a7962068e26d57c5a9892c9b0582b181083abb4fc024ef2cac970dc448`
 were independently recomputed.
+
+After PR #14 merged, final `main` workflow run `33048842078` passed with Nix
+offline during Runtime and evidence packing. Pipeline
+`RUNTIME-PIPELINE-C10BE1B2CD6BAB1E`, Asterinas result
+`RUNTIME-RESULT-290D5E36B00AC2CD`, Linux result
+`RUNTIME-RESULT-45872A9E02B6B6F6`, and comparison
+`ORACLE-COMPARISON-25B3516F3DEB8BEA` all passed. Artifact `9637034442`
+retained 32 files and 16,524,483 bytes; every file and aggregate hash
+`d48347099ecbc4a1f2928ae3d6e60fa388f08ff928f47fa60dbc42967583b3da`
+matched after download. Runtime and evidence logs contained no Nix cache
+download; all downloads occurred during input resolution.
 
 One offline, network-disabled TCG smoke ran against Asterinas
 `da81ae952e245b6bb60229457f090575c4fe97f6`. It completed in 131.5 seconds and
@@ -539,13 +551,11 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Merge the Runtime offline-boundary follow-up and rerun the manual `main`
-   baseline with both Nix execution steps using `--offline`.
-2. Cut v0.4 after that remote run and the current safety/Runtime CLI state are
-   documented on `main`.
-3. Extend low-risk ABI helpers and targets: message headers, control-message
+1. Merge the v0.4.0 release PR, create the signed annotated tag on its `main`
+   merge commit, push it, and record the tag target.
+2. Extend low-risk ABI helpers and targets: message headers, control-message
    alignment/parser progress, timespec ranges, sigset size, and mmap arithmetic.
-4. Add phase-specific Specula execution, hash-bound gates, and candidate-only
+3. Add phase-specific Specula execution, hash-bound gates, and candidate-only
    result import in the model lane.
-5. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
+4. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
    only in the authorization-gated lab.

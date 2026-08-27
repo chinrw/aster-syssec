@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aster-syssec-lab"
-version = "0.3.0"
+version = "0.4.0"
 description = "Authorization-gated Lab boundary for aster-syssec"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MPL-2.0"
 authors = [{ name = "chinrw" }]
-dependencies = ["aster-syssec==0.3.0"]
+dependencies = ["aster-syssec==0.4.0"]
 
 [project.scripts]
 syssec-lab = "aster_syssec_lab.cli:main"
