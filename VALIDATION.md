@@ -257,8 +257,22 @@ Runtime execution remains in the network-disabled container, with host
 forwarding disabled for Asterinas and `-nic none` for Linux. Asterinas PR #15
 passed all 42 reported checks and merged as
 `a516d1eb40c2e73563d4680e3251cdbdb95824dc`; content commit `41eac1dc...`
-is an ancestor of public `main`. The corresponding aster-syssec remote CI
-receipts are pending.
+is an ancestor of public `main`. All five Asterinas push workflows on that
+merge completed successfully. aster-syssec PR #25 run `33099472422` passed
+both jobs and merged as `05234d2e32d9ccc0c60dd5b3dfd2b2e582265d17`.
+Main push run `33100142989` then passed `validate` and the 23-target PR
+profile.
+
+Manual main run `33100570819` executed the complete 27-target nightly profile.
+Both jobs passed and `failed_targets` was empty. The remote profile SHA-256 is
+`2753947c49a6b21675cc58fcba71764b350b7dd9076cb58688b2c43dd0c6a4a2`.
+Artifact `9658402204` has archive digest
+`sha256:30a3d3e1ab8060b9f2adf3f11d020d6fd760c1d43e83bb014ce8a9d6168662bb`
+and compressed size 244,922 bytes. The downloaded pack contained 183 files
+and 1,663,259 bytes. Every listed file SHA-256 and size matched; there were no
+symlinks or unexpected files, and the independently recomputed content SHA-256
+matched
+`0470306c32a7036fde7d8afc847cdefd0a3dec22c3b51091bfc2dba857c519a4`.
 
 ## Post-v0.4 control-message Host extension
 
@@ -302,18 +316,18 @@ baseline that the current baseline below supersedes.
 
 ## Current runtime baseline
 
-Workflow run `33088278826` completed successfully on aster-syssec
-`58b07bf1dd724636e0af35c226bc2f2c94d4bf2a` and Asterinas
-`0bc8839d496f185dd7662c79d53e98619bf1169c`. Pipeline
-`RUNTIME-PIPELINE-F08C97F40D002CAB` passed export, Asterinas, Linux, and
+Workflow run `33101147881` completed successfully on aster-syssec
+`05234d2e32d9ccc0c60dd5b3dfd2b2e582265d17` and Asterinas
+`41eac1dc153196882beaf42472879ded679fcddc`. Pipeline
+`RUNTIME-PIPELINE-8DC48905054276DA` passed export, Asterinas, Linux, and
 comparison. Both guests returned normal results for binary SHA-256
 `696ed3ef05cda1b7d8e5f9b45bd1706ae4eef186736f028641fdf17e09cc7089`.
 
-Comparison `ORACLE-COMPARISON-EBE6A95D8F953B78` matched all seven declared
+Comparison `ORACLE-COMPARISON-C79BE981955C096B` matched all seven declared
 fields and retained `disposition=baseline`. The Runtime and evidence-pack
 steps contained zero download or Nix-store copy records. The independently
-verified pack contained 32 files and 16,524,597 bytes with content SHA-256
-`b6420d3a4757349de0bcde9e75e06c3c3f9ac02c7879ccb93b3e78272f2d8890`.
+verified pack contained 32 files and 16,525,883 bytes with content SHA-256
+`6330f79125d4f5ec91301e632cae7ec3541c482eab083b33a0cf98a23958bf26`.
 Exact input, stage, result, archive, and provenance identities are recorded in
 `docs/runtime-baseline-2026-08-27.md`.
 
