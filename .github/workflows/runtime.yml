@@ -51,6 +51,8 @@ jobs:
           packer=$(nix build .#linux-oracle-packer --out-link "$SYSSEC_JOB_ROOT/inputs/linux-oracle-packer" --print-out-paths)
           cargo_osdk=$(nix build .#cargo-osdk --out-link "$SYSSEC_JOB_ROOT/inputs/cargo-osdk" --print-out-paths)
           cargo_vendor=$(nix build .#asterinas-cargo-vendor --out-link "$SYSSEC_JOB_ROOT/inputs/asterinas-cargo-vendor" --print-out-paths)
+          nix develop .#formal --command true
+          nix develop .#default --command true
           {
             echo "bundle=$bundle"
             echo "packer=$packer"
@@ -63,7 +65,7 @@ jobs:
           SYSSEC_CARGO_OSDK_HOST: ${{ steps.runtime-inputs.outputs.cargo_osdk }}/bin/cargo-osdk
           SYSSEC_ASTERINAS_CARGO_VENDOR: ${{ steps.runtime-inputs.outputs.cargo_vendor }}
         run: |
-          nix develop .#formal --command syssec runtime run \
+          nix develop --offline .#formal --command syssec runtime run \
             --profile partial-efault-baseline \
             --asterinas "$GITHUB_WORKSPACE/asterinas" \
             --work-root "$SYSSEC_WORK_ROOT" \
@@ -77,7 +79,7 @@ jobs:
       - name: Pack Runtime evidence
         if: always()
         run: |
-          nix develop .#default --command syssec evidence pack \
+          nix develop --offline .#default --command syssec evidence pack \
             --work-root "$SYSSEC_WORK_ROOT" \
             --output "$SYSSEC_UPLOAD_ROOT" \
             --max-bytes 52428800 \

@@ -46,10 +46,10 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 
 | State | Revision | Scope |
 | --- | --- | --- |
-| merged `main` | `ce6758a` | PR #1-#12: Host Verification, Runtime Foundation, Linux differential baseline, safety boundaries, and the Runtime target pipeline |
+| merged `main` | `892d700` | PR #1-#13: Host Verification, Runtime Foundation, Linux differential baseline, safety boundaries, Runtime pipeline, and manual/weekly Runtime CI |
 | signed tag `v0.3.0` | `421c9d9` | v0.3 Host Verification record |
 
-All twelve aster-syssec PRs are merged. PR #9 head
+All thirteen aster-syssec PRs are merged. PR #9 head
 `c47ac40e3ae27c4575a539bc6a3a2bbed41518c6` passed `validate` and
 `host-verification`; merge commit `f2f431c47430b308bfec406a54b745fdb89d712b`
 is the first real differential baseline. Later merged heads are:
@@ -59,8 +59,9 @@ is the first real differential baseline. Later merged heads are:
 | #10 | `a796057` | refresh the Runtime handoff |
 | #11 | `fdeb807` | fail-closed core/model/lab target boundaries |
 | #12 | `5e64af9` | explicit four-stage Runtime target pipeline |
+| #13 | `51f4b96` | pinned manual/weekly Runtime workflow and networkless build wrapper |
 
-Merge commit `ce6758a0ef13b60b036634d7deeb7e424fb1f135` is the current public
+Merge commit `892d700f0bcb495498ece1213f0cc9b8a598ee55` is the current public
 baseline.
 
 Main push run `32953069193` completed successfully on historical merge commit
@@ -341,13 +342,19 @@ The explicit Runtime CLI provides target listing, checkout preflight, and the
 and comparison as separate hash-bound stages. Runtime is not part of ordinary
 PR or nightly profiles.
 
-The `runtime-ci-schedule` branch adds `.github/workflows/runtime.yml` with only
-manual and weekly triggers. Nix resolves the pinned oracle, packer,
-`cargo-osdk`, Asterinas workspace vendor, and pinned Rust build-std vendor
-before the Runtime stage. The build container then runs with `--network=none`,
-Cargo offline, `QEMU_HOSTFWD=off`, and no host device mounts. The workflow
-uploads only a verified 50 MiB/5,000-file evidence pack. Do not claim remote
-execution until the workflow is merged and dispatched on `main`.
+Merged `.github/workflows/runtime.yml` has only manual and weekly triggers. Nix
+resolves the pinned oracle, packer, `cargo-osdk`, Asterinas workspace vendor,
+and pinned Rust build-std vendor before the Runtime stage. The build container
+then runs with `--network=none`, Cargo offline, `QEMU_HOSTFWD=off`, and no host
+device mounts. The workflow uploads only a verified 50 MiB/5,000-file evidence
+pack.
+
+The first successful `main` run fetched one Nix store path while entering the
+formal dev shell, before `syssec` started. The `runtime-offline-boundary`
+follow-up materializes both dev shells during input resolution and passes
+`--offline` to Nix during Runtime and evidence steps. Keep that distinction
+explicit: Nix may fetch hash-pinned inputs during resolution; the execution
+boundary must fail rather than fetch.
 
 The Linux adapter seam is:
 
@@ -412,8 +419,15 @@ both normal VM results bound binary SHA-256 `696ed3...7089`, and comparison
 evidence pack retained 32 files and 16,307,773 bytes. The Asterinas workspace
 vendor hash is `sha256-BCSyswj+Q1wm6M/XthjZfgjj43tAtmRvhCD4V0ygjCc=`; the
 pinned nightly build-std vendor hash is
-`sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=`. This is local executed
-evidence, not a remote workflow claim.
+`sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=`.
+
+Manual `main` workflow run `33046453514` passed in 13 minutes 22 seconds.
+Remote pipeline `RUNTIME-PIPELINE-1FFB96559AE63CB4`, both normal VM results,
+and comparison `ORACLE-COMPARISON-DC078CD0DA73B598` bound the same
+`696ed3...7089` binary and matched all seven fields. Artifact `9636131500`
+retained 32 files and 16,524,759 bytes. Every downloaded file hash and aggregate
+content hash `959ad3a7962068e26d57c5a9892c9b0582b181083abb4fc024ef2cac970dc448`
+were independently recomputed.
 
 One offline, network-disabled TCG smoke ran against Asterinas
 `da81ae952e245b6bb60229457f090575c4fe97f6`. It completed in 131.5 seconds and
@@ -525,10 +539,10 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Merge the Runtime workflow, manually dispatch it on `main`, retain the
-   verified artifact, and record the run ID and aggregate evidence hash.
-2. Cut v0.4 after the remote Runtime baseline and current safety/Runtime CLI
-   state are documented on `main`.
+1. Merge the Runtime offline-boundary follow-up and rerun the manual `main`
+   baseline with both Nix execution steps using `--offline`.
+2. Cut v0.4 after that remote run and the current safety/Runtime CLI state are
+   documented on `main`.
 3. Extend low-risk ABI helpers and targets: message headers, control-message
    alignment/parser progress, timespec ranges, sigset size, and mmap arithmetic.
 4. Add phase-specific Specula execution, hash-bound gates, and candidate-only

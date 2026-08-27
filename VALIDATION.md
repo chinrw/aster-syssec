@@ -133,7 +133,7 @@ The final tree passed the locked flake gate with 154 tests, the Lab package and
 boundary contract, the initramfs packer contract, Ruff, formatting, Pyright,
 JSON Schema validation, Actionlint, and ShellCheck.
 
-## Runtime workflow pre-merge validation
+## Runtime workflow validation
 
 The `runtime-ci-schedule` branch was exercised locally on 2026-08-27 with the
 same wrapper and immutable inputs declared by `.github/workflows/runtime.yml`.
@@ -175,8 +175,26 @@ The CI-budget evidence pack verified one manifest and retained 32 files,
 The locked flake gate passed with 159 tests, the Lab boundary and packer shell
 contracts, Ruff, formatting, Pyright, JSON Schema validation, Actionlint, and
 ShellCheck.
-Remote workflow execution remains unclaimed until this workflow is merged and
-manually dispatched on `main`.
+
+PR #13 merged as `892d700f0bcb495498ece1213f0cc9b8a598ee55`. Manual
+`main` run `33046453514` then completed successfully in 13 minutes 22 seconds.
+Remote pipeline `RUNTIME-PIPELINE-1FFB96559AE63CB4` passed all four stages;
+Asterinas result `RUNTIME-RESULT-C6FC018342807742` and Linux result
+`RUNTIME-RESULT-E3D9E812576EBE04` were normal and bound the same static binary.
+Comparison `ORACLE-COMPARISON-DC078CD0DA73B598` matched all seven fields and
+retained `disposition=baseline`.
+
+Artifact `9636131500` uploaded 32 files. Its uncompressed pack contained
+16,524,759 bytes with aggregate content SHA-256
+`959ad3a7962068e26d57c5a9892c9b0582b181083abb4fc024ef2cac970dc448`.
+After download, every registered file hash and the aggregate hash were
+independently recomputed and matched the index.
+
+The successful run resolved one additional Nix store path when entering the
+formal dev shell, before `syssec` started. The Runtime container and both QEMU
+guests remained network-off. The `runtime-offline-boundary` follow-up moves dev
+shell materialization into input resolution and invokes Nix with `--offline`
+during Runtime execution and evidence packing.
 
 ## v0.3 Host Verification baseline
 
