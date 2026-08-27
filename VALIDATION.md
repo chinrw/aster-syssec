@@ -38,12 +38,40 @@ were primed, with execution remaining offline. The verified nightly evidence
 pack retained 117 files and 1,269,575 bytes with content SHA-256
 `67218b44276ea01f4d6563cc3f6e9a4ac248d8b9a8030db46bee45d52d365403`.
 
+Manual main run `33057517578` then executed the 16-target nightly profile on a
+GitHub runner. `validate` and `host-verification` passed; all targets reported
+their expected outcome and `failed_targets` was empty. The remote profile
+result SHA-256 is
+`53c9da816d224947b7ac1ee2627facfe5964d980b5d966b2e0f07b52b639d156`.
+Artifact `9640644616` has archive digest
+`sha256:d68ef3dff462164bb2922c62de986ef9cf2c9abf86f6df73f6089286258c0f26`
+and compressed size 172,748 bytes. The downloaded pack contained 117 files and
+1,273,350 bytes. Every listed file SHA-256 and size matched; the independently
+recomputed content SHA-256 matched
+`04204dcfa82dad651b58e9caa9ba9c42d0698ca05e097112d000bcc556ad9759`.
+
 Both fixed-output vendor derivations rebuilt at their existing hashes. The
-Runtime workflow now selects the same Asterinas commit, but the last completed
-real dual-VM baseline below remains the v0.4.0 run until a new Runtime job is
-recorded.
+Runtime workflow selects the same Asterinas commit. Main run `33055916200`
+then produced the current real dual-VM baseline below.
 
 ## Current runtime baseline
+
+Workflow run `33055916200` completed successfully on aster-syssec
+`4af32509539a4f4604ec5cc30bc1d2a4535c7f1c` and Asterinas
+`5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb`. Pipeline
+`RUNTIME-PIPELINE-2AAC2AB2DD4DB13A` passed export, Asterinas, Linux, and
+comparison. Both guests returned normal results for binary SHA-256
+`696ed3ef05cda1b7d8e5f9b45bd1706ae4eef186736f028641fdf17e09cc7089`.
+
+Comparison `ORACLE-COMPARISON-6E7E057406AE0C1A` matched all seven declared
+fields and retained `disposition=baseline`. The Runtime and evidence-pack
+steps contained zero download or Nix-store copy records. The independently
+verified pack contained 32 files and 16,524,561 bytes with content SHA-256
+`ea67f513a13ca36de0c754e75e57ed433feca815d2fd81223ecc32c0c196f542`.
+Exact input, stage, result, archive, and provenance identities are recorded in
+`docs/runtime-baseline-2026-08-27.md`.
+
+## v0.4.0 runtime baseline
 
 The 2026-08-26 baseline pins Asterinas
 `d0bddbf56d893221d103a0c3330f379dc59977b9` with NAR hash
@@ -75,7 +103,7 @@ Actionlint: passed
 ShellCheck: passed
 ```
 
-## Current CI and nightly baseline
+## v0.4.0 CI and nightly baseline
 
 aster-syssec PR #9 merged as
 `f2f431c47430b308bfec406a54b745fdb89d712b`. Its PR checks passed against

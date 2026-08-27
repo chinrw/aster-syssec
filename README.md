@@ -302,8 +302,9 @@ has no pull-request or push trigger.
 The case-specific comparator requires schema-valid Asterinas and Linux normal
 results that bind the same static binary. Equal fields produce a baseline;
 differences remain candidates; missing outcomes or provenance remain
-incomplete. The first real result and comparison are recorded in
-[`docs/runtime-baseline-2026-08-26.md`](docs/runtime-baseline-2026-08-26.md).
+incomplete. The current result and comparison are recorded in
+[`docs/runtime-baseline-2026-08-27.md`](docs/runtime-baseline-2026-08-27.md);
+the [2026-08-26 record](docs/runtime-baseline-2026-08-26.md) remains historical.
 
 ## Inventory
 
