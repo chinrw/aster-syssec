@@ -6,10 +6,13 @@ from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 
+from .safety import SafetyClass
+
 
 @dataclass(frozen=True)
 class VerificationProfile:
     id: str
+    safety_class: SafetyClass
     commands: tuple[str, ...]
     targets: tuple[str, ...]
     external_required: tuple[str, ...]
@@ -54,6 +57,7 @@ def load_profile_registry(path: Path | None = None) -> ProfileRegistry:
             raise TypeError(f"verification profile must be an object: {profile_id}")
         allowed = {
             "implemented_commands",
+            "safety_class",
             "targets",
             "external_required",
             "blocking",
@@ -64,8 +68,20 @@ def load_profile_registry(path: Path | None = None) -> ProfileRegistry:
             raise ValueError(
                 f"verification profile {profile_id} has unknown keys: {unknown}"
             )
+        safety_class = item.get("safety_class")
+        if not isinstance(safety_class, str):
+            raise TypeError(
+                f"verification profile {profile_id} must declare safety_class"
+            )
+        try:
+            parsed_safety_class = SafetyClass(safety_class)
+        except ValueError as error:
+            raise ValueError(
+                f"verification profile {profile_id} has unknown safety_class: {safety_class}"
+            ) from error
         profiles[profile_id] = VerificationProfile(
             id=profile_id,
+            safety_class=parsed_safety_class,
             commands=_string_tuple(item.get("implemented_commands", []), profile_id),
             targets=_string_tuple(item.get("targets", []), profile_id),
             external_required=_string_tuple(

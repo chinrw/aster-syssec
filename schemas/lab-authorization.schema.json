@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/lab-authorization.schema.json",
+  "title": "aster-syssec Lab authorization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "authorization_id",
+    "repository",
+    "revision",
+    "authorization",
+    "allowed_scope",
+    "excluded",
+    "approved_by",
+    "approved_at",
+    "expires_at",
+    "execution"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "authorization_id": {
+      "type": "string",
+      "pattern": "^LAB-AUTH-[0-9A-F]{16}$"
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "revision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "authorization": { "const": "owned defensive test environment" },
+    "allowed_scope": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "excluded": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 },
+      "allOf": [
+        { "contains": { "const": "external targets" } },
+        { "contains": { "const": "network propagation" } },
+        { "contains": { "const": "persistence" } },
+        { "contains": { "const": "credential theft" } },
+        { "contains": { "const": "production deployment" } }
+      ]
+    },
+    "approved_by": { "type": "string", "minLength": 1 },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "network", "agent_mode"],
+      "properties": {
+        "environment": { "const": "isolated-vm" },
+        "network": { "const": "off" },
+        "agent_mode": { "const": "manual-only" }
+      }
+    }
+  }
+}

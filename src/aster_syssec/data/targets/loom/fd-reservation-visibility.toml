@@ -11,6 +11,13 @@ max_preemptions = 3
 max_permutations = 10000
 source_symbols = ["FdSlot"]
 
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
 [limits]
 timeout_seconds = 300
 memory_bytes = 8589934592

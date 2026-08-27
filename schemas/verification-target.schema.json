@@ -11,6 +11,7 @@
     "track",
     "properties",
     "source_symbols",
+    "safety",
     "limits",
     "policy"
   ],
@@ -82,6 +83,9 @@
       "minItems": 1,
       "uniqueItems": true,
       "items": { "type": "string", "minLength": 1 }
+    },
+    "safety": {
+      "$ref": "https://asterinas.dev/syssec/safety-policy.schema.json"
     },
     "limits": {
       "type": "object",

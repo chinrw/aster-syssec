@@ -8,6 +8,13 @@ test = "user_iovec_layout_matches_the_linux_abi"
 target_triple = "x86_64-unknown-linux-gnu"
 source_symbols = ["UserIoVec"]
 
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
 [limits]
 timeout_seconds = 300
 memory_bytes = 8589934592

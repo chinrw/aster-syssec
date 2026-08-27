@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/safety-policy.schema.json",
+  "title": "aster-syssec target safety policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "class",
+    "agent_mode",
+    "network",
+    "may_generate_reproducer",
+    "requires_authorization"
+  ],
+  "properties": {
+    "class": { "enum": ["core", "model", "lab"] },
+    "agent_mode": {
+      "enum": ["allowed", "analysis-only", "manual-only"]
+    },
+    "network": { "type": "boolean" },
+    "may_generate_reproducer": { "type": "boolean" },
+    "requires_authorization": { "type": "boolean" }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "class": { "const": "core" },
+        "agent_mode": { "const": "allowed" },
+        "network": { "const": false },
+        "may_generate_reproducer": { "const": false },
+        "requires_authorization": { "const": false }
+      }
+    },
+    {
+      "properties": {
+        "class": { "const": "model" },
+        "agent_mode": { "const": "analysis-only" },
+        "may_generate_reproducer": { "const": false },
+        "requires_authorization": { "const": false }
+      }
+    },
+    {
+      "properties": {
+        "class": { "const": "lab" },
+        "agent_mode": { "const": "manual-only" },
+        "network": { "const": false },
+        "requires_authorization": { "const": true }
+      }
+    }
+  ]
+}

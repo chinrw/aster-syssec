@@ -30,6 +30,11 @@ from .reporting import (
     review_markdown,
 )
 from .runs import RunContext
+from .safety import (
+    require_core_class,
+    require_core_execution,
+    require_profile_target_safety,
+)
 from .scanner import RULE_IDS, StaticReviewer
 from .schemas import validate_instance
 from .selection import select_review_paths
@@ -664,6 +669,7 @@ def _targets_list(args: argparse.Namespace) -> int:
         for item in values:
             print(
                 f"{item['id']}: {item['engine']} {item['track']} "
+                f"safety={item['safety']['class']} "
                 f"expected={item['expected']} pr_blocking={str(item['pr_blocking']).lower()}"
             )
     return 0
@@ -712,6 +718,7 @@ def _run_target(args: argparse.Namespace) -> int:
     registry = load_registry(args.config_root)
     targets = load_target_registry(registry, args.target_root)
     target = targets.require(args.target)
+    require_core_execution(target.safety, operation="run-target")
     work_root = _work_root(args.work_root)
     run = RunContext.start(
         work_root=work_root,
@@ -722,6 +729,7 @@ def _run_target(args: argparse.Namespace) -> int:
             "target": target.id,
             "target_config_sha256": target.config_sha256,
             "target_registry_hash": targets.config_hash,
+            "safety_class": target.safety.safety_class.value,
         },
     )
     try:
@@ -752,6 +760,7 @@ def _run_target(args: argparse.Namespace) -> int:
         "run": str(run.root),
         "target": target.id,
         "engine": target.engine,
+        "safety_class": target.safety.safety_class.value,
         "outcome": execution.outcome,
         "expected": target.policy.expected,
         "expectation_met": execution.expectation_met,
@@ -781,6 +790,13 @@ def _run_profile(args: argparse.Namespace) -> int:
     profiles = load_profile_registry(args.profile_config)
     profile = profiles.require(args.profile)
     selected = [targets.require(target_id) for target_id in profile.targets]
+    require_core_class(profile.safety_class, operation="run profile")
+    for target in selected:
+        require_profile_target_safety(
+            profile_class=profile.safety_class,
+            target_id=target.id,
+            target_policy=target.safety,
+        )
     work_root = _work_root(args.work_root)
     run = RunContext.start(
         work_root=work_root,
@@ -789,6 +805,7 @@ def _run_profile(args: argparse.Namespace) -> int:
         registry=registry,
         parameters={
             "profile": profile.id,
+            "safety_class": profile.safety_class.value,
             "profile_config_sha256": profiles.config_sha256,
             "target_registry_hash": targets.config_hash,
             "changed_from": args.changed_from,
@@ -834,6 +851,7 @@ def _run_profile(args: argparse.Namespace) -> int:
                 {
                     "target": target.id,
                     "engine": target.engine,
+                    "safety_class": target.safety.safety_class.value,
                     "result_id": execution.result["result_id"],
                     "outcome": execution.outcome,
                     "expected": target.policy.expected,
@@ -851,6 +869,7 @@ def _run_profile(args: argparse.Namespace) -> int:
         result = {
             "schema_version": 1,
             "profile": profile.id,
+            "safety_class": profile.safety_class.value,
             "status": "pass" if passed else "fail",
             "profile_config_sha256": profiles.config_sha256,
             "target_registry_hash": targets.config_hash,

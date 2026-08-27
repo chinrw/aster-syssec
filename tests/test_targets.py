@@ -14,6 +14,7 @@ from aster_syssec.cli import main
 from aster_syssec.config import load_registry
 from aster_syssec.inventory import InventoryBuilder
 from aster_syssec.profiles import load_profile_registry
+from aster_syssec.safety import SafetyClass
 from aster_syssec.targets import load_target_registry
 from tests.helpers import init_git_repository, write_fixture
 
@@ -47,6 +48,38 @@ class PackagedProfileTests(unittest.TestCase):
         self.assertNotIn("Loom models", nightly.external_required)
         self.assertFalse(nightly.fail_fast)
 
+    def test_default_profiles_and_targets_are_core_only(self) -> None:
+        profiles = load_profile_registry()
+        targets = load_target_registry(load_registry()).targets
+
+        self.assertEqual(profiles.require("pr").safety_class, SafetyClass.CORE)
+        self.assertEqual(profiles.require("nightly").safety_class, SafetyClass.CORE)
+        self.assertEqual(profiles.require("release").safety_class, SafetyClass.CORE)
+        self.assertTrue(
+            all(
+                target.safety.safety_class is SafetyClass.CORE
+                for target in targets.values()
+            )
+        )
+
+    def test_profile_without_a_safety_class_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = Path(tmp) / "profiles.toml"
+            profile.write_text(
+                """
+version = 1
+
+[profiles.test]
+implemented_commands = []
+targets = []
+external_required = []
+""".lstrip(),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(TypeError, "must declare safety_class"):
+                load_profile_registry(profile)
+
 
 def write_kani_target(root: Path) -> Path:
     target = root / "kani/iovec-entry-address-no-wrap.toml"
@@ -61,6 +94,13 @@ properties = ["BOUNDARY-VALIDATION", "LINUX-ABI-CONTRACT"]
 package = "aster-uapi"
 harness = "proof_iovec_entry_address_no_wrap"
 source_symbols = ["iovec_entry_addr"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
 
 [limits]
 timeout_seconds = 300
@@ -90,6 +130,13 @@ package = "aster-uapi"
 test = "user_iovec_layout_matches_the_linux_abi"
 target_triple = "x86_64-unknown-linux-gnu"
 source_symbols = ["UserIoVec"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
 
 [limits]
 timeout_seconds = 300
@@ -122,6 +169,13 @@ record = "UserIoVec"
 section = ".syssec.layout"
 endianness = "little"
 source_symbols = ["UserIoVec", "USER_IOVEC_LAYOUT"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
 
 [expected_layout]
 pointer_width = 64
@@ -163,6 +217,13 @@ max_input_size = 32
 sanitizer = "none"
 source_symbols = ["UserIoVec", "truncate_iovec_len", "iovec_entry_addr"]
 
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
 [limits]
 timeout_seconds = 300
 memory_bytes = 8589934592
@@ -192,6 +253,13 @@ target_triple = "x86_64-unknown-linux-gnu"
 max_branches = 1000
 max_preemptions = 3
 source_symbols = ["FdSlot"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
 
 [limits]
 timeout_seconds = 300
@@ -307,10 +375,59 @@ exit 2
                         "BOUNDARY-VALIDATION",
                         "LINUX-ABI-CONTRACT",
                     ],
+                    "safety": {
+                        "agent_mode": "allowed",
+                        "class": "core",
+                        "may_generate_reproducer": False,
+                        "network": False,
+                        "requires_authorization": False,
+                    },
                     "track": "user-memory-partial-io",
                 }
             ],
         )
+
+    def test_main_cli_refuses_to_execute_a_lab_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            source = write_fixture(base / "asterinas")
+            target_root = write_kani_target(base / "targets")
+            target = target_root / "kani/iovec-entry-address-no-wrap.toml"
+            content = target.read_text(encoding="utf-8")
+            content = content.replace('class = "core"', 'class = "lab"')
+            content = content.replace(
+                'agent_mode = "allowed"', 'agent_mode = "manual-only"'
+            )
+            content = content.replace(
+                "may_generate_reproducer = false",
+                "may_generate_reproducer = true",
+            )
+            content = content.replace(
+                "requires_authorization = false",
+                "requires_authorization = true",
+            )
+            target.write_text(content, encoding="utf-8")
+            work = base / "work"
+            stderr = io.StringIO()
+
+            with contextlib.redirect_stderr(stderr):
+                status = main(
+                    [
+                        "run-target",
+                        "--asterinas",
+                        str(source),
+                        "--work-root",
+                        str(work),
+                        "--target-root",
+                        str(target_root),
+                        "--target",
+                        "iovec-entry-address-no-wrap",
+                    ]
+                )
+
+        self.assertEqual(status, 2)
+        self.assertIn("does not execute lab targets", stderr.getvalue())
+        self.assertFalse(work.exists())
 
     def test_targets_check_proves_package_symbols_and_harness_exist(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -510,6 +627,13 @@ properties = ["BOUNDARY-VALIDATION"]
 package = "aster-uapi"
 harness = "proof_negative_control"
 source_symbols = ["proof_negative_control"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
 
 [limits]
 timeout_seconds = 300
@@ -981,6 +1105,7 @@ fn proof_iovec_entry_address_no_wrap() {
 version = 1
 
 [profiles.pr]
+safety_class = "core"
 implemented_commands = []
 targets = ["iovec-entry-address-no-wrap"]
 external_required = []
@@ -1036,7 +1161,9 @@ echo "Complete - 1 successfully verified harnesses, 0 failures, 1 total."
 
         self.assertEqual(status, 0)
         self.assertEqual(result["profile"], "pr")
+        self.assertEqual(result["safety_class"], "core")
         self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["target_results"][0]["safety_class"], "core")
         self.assertEqual(result["target_results"][0]["outcome"], "pass")
         profile_result = next(
             item
@@ -1097,6 +1224,7 @@ fn proof_second_target() {
 version = 1
 
 [profiles.nightly]
+safety_class = "core"
 implemented_commands = []
 targets = ["iovec-entry-address-no-wrap", "iovec-second-proof"]
 external_required = []
@@ -1192,6 +1320,7 @@ echo "Complete - 1 successfully verified harnesses, 0 failures, 1 total."
 version = 1
 
 [profiles.pr]
+safety_class = "core"
 implemented_commands = ["config-check"]
 targets = []
 external_required = []
@@ -1249,6 +1378,7 @@ fail_fast = true
 version = 1
 
 [profiles.nightly]
+safety_class = "core"
 implemented_commands = ["inventory --check"]
 targets = []
 external_required = []
@@ -1302,6 +1432,7 @@ fail_fast = true
 version = 1
 
 [profiles.nightly]
+safety_class = "core"
 implemented_commands = ["review"]
 targets = []
 external_required = []
@@ -1361,6 +1492,7 @@ fail_fast = true
 version = 1
 
 [profiles.pr]
+safety_class = "core"
 implemented_commands = ["review --changed-from"]
 targets = []
 external_required = []
@@ -1427,6 +1559,7 @@ fail_fast = true
 version = 1
 
 [profiles.release]
+safety_class = "core"
 implemented_commands = ["inventory --check --baseline"]
 targets = []
 external_required = []

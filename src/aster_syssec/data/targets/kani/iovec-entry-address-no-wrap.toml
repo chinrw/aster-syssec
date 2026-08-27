@@ -7,6 +7,13 @@ package = "aster-uapi"
 harness = "proof_iovec_entry_address_no_wrap"
 source_symbols = ["iovec_entry_addr"]
 
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
 [limits]
 timeout_seconds = 300
 memory_bytes = 8589934592

@@ -13,6 +13,7 @@
     "target_arch",
     "properties",
     "source_symbols",
+    "safety",
     "oracle",
     "comparator",
     "limits",
@@ -42,6 +43,9 @@
       "minItems": 1,
       "uniqueItems": true,
       "items": { "type": "string", "minLength": 1 }
+    },
+    "safety": {
+      "$ref": "https://asterinas.dev/syssec/safety-policy.schema.json"
     },
     "oracle": {
       "type": "string",

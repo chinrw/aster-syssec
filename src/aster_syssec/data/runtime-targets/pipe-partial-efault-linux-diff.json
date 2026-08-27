@@ -13,6 +13,13 @@
     "SYS_read",
     "readv"
   ],
+  "safety": {
+    "class": "core",
+    "agent_mode": "allowed",
+    "network": false,
+    "may_generate_reproducer": false,
+    "requires_authorization": false
+  },
   "oracle": "linux-x86-64-6-18-45",
   "comparator": "partial-efault-pipe-read-v1",
   "limits": {
