@@ -1,0 +1,26 @@
+version = 1
+id = "sigset-exact-size"
+engine = "kani"
+track = "abi-integer-layout"
+properties = ["BOUNDARY-VALIDATION", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+harness = "proof_sigset_size_matches_linux_abi"
+source_symbols = [
+  "SigsetSizeError", "USER_SIGSET_SIZE", "validate_sigset_size",
+]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+unwind = 8
+
+[policy]
+expected = "pass"
+pr_blocking = true

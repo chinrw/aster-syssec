@@ -1,0 +1,26 @@
+version = 1
+id = "user-sigset-layout"
+engine = "miri"
+track = "abi-integer-layout"
+properties = ["NO-UNINITIALIZED-COPYOUT", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+test = "user_sigset_layout_matches_the_linux_abi"
+target_triple = "x86_64-unknown-linux-gnu"
+source_symbols = [
+  "CUserSigSet", "USER_SIGSET_LAYOUT", "USER_SIGSET_SIZE",
+]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+
+[policy]
+expected = "pass"
+pr_blocking = true
