@@ -283,6 +283,20 @@ Build the pinned Linux 6.18.45 kernel/config/rootfs/packer bundle with:
 nix build .#linux-oracle-bundle
 ```
 
+The manual and weekly Runtime workflow also resolves a patched, pinned
+`cargo-osdk` and a combined Cargo vendor. The vendor is derived from the
+Asterinas workspace `Cargo.lock` and the `library/Cargo.lock` supplied by the
+`nightly-2026-07-21` toolchain selected in Asterinas `rust-toolchain.toml`:
+
+```sh
+nix build .#cargo-osdk .#asterinas-cargo-vendor
+```
+
+Nix may fetch those hash-pinned public inputs before execution. The Runtime
+container then runs with Docker networking disabled, Cargo offline, host
+forwarding disabled, and both Asterinas and Linux QEMU networking disabled.
+`.github/workflows/runtime.yml` has no pull-request or push trigger.
+
 The case-specific comparator requires schema-valid Asterinas and Linux normal
 results that bind the same static binary. Equal fields produce a baseline;
 differences remain candidates; missing outcomes or provenance remain

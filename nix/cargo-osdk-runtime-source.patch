@@ -1,0 +1,42 @@
+diff --git a/osdk/src/util.rs b/osdk/src/util.rs
+index 4d58855..78afad4 100644
+--- a/osdk/src/util.rs
++++ b/osdk/src/util.rs
+@@ -18,0 +19,6 @@ use quote::ToTokens;
++pub fn osdk_source_dir() -> PathBuf {
++    let source_root = std::env::var_os("OSDK_SOURCE_ROOT")
++        .expect("OSDK_SOURCE_ROOT must point to the pinned Asterinas checkout");
++    PathBuf::from(source_root).join("osdk")
++}
++
+@@ -21 +27 @@ pub fn ostd_dep() -> String {
+-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
++        let path = osdk_source_dir()
+diff --git a/osdk/src/base_crate/mod.rs b/osdk/src/base_crate/mod.rs
+index f0a2c8b..a8df18f 100644
+--- a/osdk/src/base_crate/mod.rs
++++ b/osdk/src/base_crate/mod.rs
+@@ -98,0 +99 @@ pub fn new_base_crate(
++        let lock_exists = base_crate_path.join("Cargo.lock").is_file();
+@@ -100 +101,4 @@ pub fn new_base_crate(
+-        if cargo_result.is_ok_and(|res| res) && main_rs_result.is_ok_and(|res| res) {
++        if cargo_result.is_ok_and(|res| res)
++            && main_rs_result.is_ok_and(|res| res)
++            && lock_exists
++        {
+@@ -161,0 +166,5 @@ fn do_new_base_crate(
++    fs::copy(
++        workspace_root.join("Cargo.lock"),
++        base_crate_path.as_ref().join("Cargo.lock"),
++    )
++    .expect("workspace Cargo.lock must be available to the generated OSDK crate");
+@@ -272 +281 @@ fn add_manifest_dependency_to(manifest: &mut toml::Value, dep_name: &str, path:
+-            let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
++            let crate_dir = crate::util::osdk_source_dir();
+diff --git a/osdk/src/commands/build/bin.rs b/osdk/src/commands/build/bin.rs
+index 191df14..970cd04 100644
+--- a/osdk/src/commands/build/bin.rs
++++ b/osdk/src/commands/build/bin.rs
+@@ -186 +186 @@ fn install_linux_bzimage_setup(
+-        let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
++        let crate_dir = crate::util::osdk_source_dir();

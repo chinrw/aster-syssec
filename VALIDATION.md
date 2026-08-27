@@ -133,6 +133,51 @@ The final tree passed the locked flake gate with 154 tests, the Lab package and
 boundary contract, the initramfs packer contract, Ruff, formatting, Pyright,
 JSON Schema validation, Actionlint, and ShellCheck.
 
+## Runtime workflow pre-merge validation
+
+The `runtime-ci-schedule` branch was exercised locally on 2026-08-27 with the
+same wrapper and immutable inputs declared by `.github/workflows/runtime.yml`.
+The Asterinas build container was pinned to image digest
+`sha256:a32c639c66899de90875f4b1aa8614926ec172957bb27c59a93c94fdde4da934`
+and ran with Docker networking disabled.
+
+Nix fixed two Cargo vendor inputs:
+
+- Asterinas workspace `Cargo.lock`:
+  `sha256-BCSyswj+Q1wm6M/XthjZfgjj43tAtmRvhCD4V0ygjCc=`;
+- pinned `nightly-2026-07-21` Rust `library/Cargo.lock`:
+  `sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=`.
+
+The patched `cargo-osdk` copies the workspace lockfile into each generated
+base crate. Its offline dependency resolution was first reproduced without the
+lockfile at exit 101, then passed with the pinned lockfile. The combined vendor
+also contains the pinned build-std dependencies; no Runtime-stage Cargo or VM
+network access is required.
+
+Pipeline `RUNTIME-PIPELINE-53FB20716090B443` passed all four stages:
+
+| Stage | Result SHA-256 |
+| --- | --- |
+| export-binary | `f9b3430791dca09cdc98ccdc5df8c024c383eeb3df779177ce16382e480efb66` |
+| run-asterinas | `e686e3a45b69654613b9d0dee91db76dba8ba331f69f27fe07c2796330c72d23` |
+| run-linux | `bd0725beed6f8fd3f29dd149048fa3c981ab2e0c35664b95c407cc518ea07482` |
+| compare | `8086bd8b1732816dab07c008c5be1ca51ead2be2f9757be200a6c981620c6a08` |
+
+Asterinas result `RUNTIME-RESULT-6D9D7CBCFF442C92` and Linux result
+`RUNTIME-RESULT-E5CD1AB51C3CBCFE` were both normal and bound binary SHA-256
+`696ed3ef05cda1b7d8e5f9b45bd1706ae4eef186736f028641fdf17e09cc7089`.
+Comparison `ORACLE-COMPARISON-8E777E1A1927BC98` matched all seven fields and
+retained `disposition=baseline`. No Runtime container remained after exit.
+
+The CI-budget evidence pack verified one manifest and retained 32 files,
+16,307,773 bytes, with aggregate content SHA-256
+`bd571f2b84b4823deda63732cfcc73febd378ca7d20f4624857da47ae193887b`.
+The locked flake gate passed with 159 tests, the Lab boundary and packer shell
+contracts, Ruff, formatting, Pyright, JSON Schema validation, Actionlint, and
+ShellCheck.
+Remote workflow execution remains unclaimed until this workflow is merged and
+manually dispatched on `main`.
+
 ## v0.3 Host Verification baseline
 
 Observed on 2026-08-24 against clean revisions:

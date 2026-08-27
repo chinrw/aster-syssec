@@ -365,9 +365,14 @@ printf '%s\n' \\
             result = AsterinasQemuAdapter(
                 make_executable=str(make),
                 cargo_osdk_executable="/opt/cargo-osdk",
+                build_environment="asterinas/dev@sha256:" + "a" * 64,
             ).execute(runtime_request(source, evidence_root))
 
             self.assertEqual(result["outcome"], "normal")
+            self.assertEqual(
+                result["tool"]["build_environment"],
+                "asterinas/dev@sha256:" + "a" * 64,
+            )
             validate_instance(result, "runtime-result.schema.json")
 
     def test_process_start_failure_is_recorded_as_a_runtime_result(self) -> None:

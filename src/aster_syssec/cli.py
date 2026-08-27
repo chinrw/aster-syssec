@@ -280,6 +280,7 @@ def build_parser() -> argparse.ArgumentParser:
     runtime_run.add_argument("--nix-store-executable", default="nix-store")
     runtime_run.add_argument("--readelf-executable", default="readelf")
     runtime_run.add_argument("--cargo-osdk-executable")
+    runtime_run.add_argument("--asterinas-build-environment")
     runtime_run.add_argument("--json", action="store_true")
     runtime_run.set_defaults(handler=_runtime_run)
 
@@ -1059,6 +1060,7 @@ def _runtime_run(args: argparse.Namespace) -> int:
             "initramfs_packer": args.initramfs_packer,
             "export_make_executable": args.export_make_executable,
             "asterinas_make_executable": args.asterinas_make_executable,
+            "asterinas_build_environment": args.asterinas_build_environment,
             "safety_class": target.safety.safety_class.value,
         },
     )
@@ -1086,6 +1088,7 @@ def _runtime_run(args: argparse.Namespace) -> int:
             asterinas_adapter=AsterinasQemuAdapter(
                 make_executable=args.asterinas_make_executable,
                 cargo_osdk_executable=args.cargo_osdk_executable,
+                build_environment=args.asterinas_build_environment,
             ),
             linux_adapter=LinuxOracleAdapter(
                 oracle_metadata_path=args.oracle_metadata,
