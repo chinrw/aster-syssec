@@ -17,7 +17,7 @@ git rev-parse HEAD
 git log --oneline --decorate -12
 git diff --stat origin/main...HEAD
 gh pr list --repo chinrw/aster-syssec --state open --limit 10
-gh pr view 5 --repo chinrw/asterinas
+gh pr view 8 --repo chinrw/asterinas
 gh run list --repo chinrw/aster-syssec --branch main --limit 5
 ```
 
@@ -46,11 +46,11 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 
 | State | Revision | Scope |
 | --- | --- | --- |
-| merged `main` | `4af3250` | PR #1-#17: v0.4 baseline plus control-message Host Verification |
+| merged implementation baseline | `c344f83` | PR #1-#19: v0.4 plus control- and message-header Host Verification |
 | signed tag `v0.4.0` | `30b5a4d` | v0.4 Host-to-Runtime verification record |
 | signed tag `v0.3.0` | `421c9d9` | v0.3 Host Verification record |
 
-All seventeen aster-syssec PRs are merged. PR #9 head
+PR #19 is the latest merged implementation PR. PR #9 head
 `c47ac40e3ae27c4575a539bc6a3a2bbed41518c6` passed `validate` and
 `host-verification`; merge commit `f2f431c47430b308bfec406a54b745fdb89d712b`
 is the first real differential baseline. Later merged heads are:
@@ -65,9 +65,11 @@ is the first real differential baseline. Later merged heads are:
 | #15 | `9ab6b17` | v0.4.0 versions, release record, and version consistency gate |
 | #16 | `df15318` | signed v0.4.0 tag receipt and refreshed release handoff |
 | #17 | `20336ee` | 16-target control-message Host Verification and workflow pin lock |
+| #18 | `cfa7583` | control-message Host and Runtime evidence receipt |
+| #19 | `95558d5` | 19-target message-header Host Verification and workflow pin lock |
 
-Merge commit `4af32509539a4f4604ec5cc30bc1d2a4535c7f1c` is the current public
-baseline.
+Merge commit `c344f8323db7241ea1a3f412a9ee148426b9cc8f` is the current public
+implementation baseline.
 
 Main push run `32953069193` completed successfully on historical merge commit
 `f2f431c`. Both `validate` and the PR-profile `host-verification` job passed.
@@ -76,15 +78,25 @@ Scheduled run `33004803564` executed the historical 11-target `nightly`
 profile on `f2f431c` and passed. PR #17 run `33054763312` passed `validate` and
 the 12-target PR-profile `host-verification` job.
 
-Manual main run `33057517578` executed the current 16-target nightly profile
-and passed both jobs. Its downloaded Host evidence pack contained 117 files and
-1,273,350 bytes; every listed file hash and size matched. The independently
-recomputed content SHA-256 is
+Manual main run `33057517578` executed the then-current 16-target nightly
+profile and passed both jobs. Its downloaded Host evidence pack contained 117
+files and 1,273,350 bytes; every listed file hash and size matched. The
+independently recomputed content SHA-256 is
 `04204dcfa82dad651b58e9caa9ba9c42d0698ca05e097112d000bcc556ad9759`.
 GitHub artifact `9640644616` is 172,748 compressed bytes with archive digest
 `sha256:d68ef3dff462164bb2922c62de986ef9cf2c9abf86f6df73f6089286258c0f26`.
 The pre-fix artifact was 1,136,398,829 bytes because it included cache and
 build trees.
+
+PR #19 run `33062684112` passed `validate` and the 15-target PR profile. Main
+push run `33065312608` then passed both jobs on merge commit `c344f832...`.
+Manual main run `33066250182` passed the complete 19-target nightly profile.
+Its downloaded Host evidence pack contained 135 files and 1,389,410 bytes;
+every listed file hash and size matched. The independently recomputed content
+SHA-256 is
+`f0fd6aefcb1e15cacaa83dc9c5e0cf592fccadabc1d67d63c957ef24387d2260`.
+GitHub artifact `9643932986` is 192,236 compressed bytes with archive digest
+`sha256:05ab9198fdb1d797ec2a704f6549e451872844d0d723e611d6cc32730acddefc`.
 
 Both packages and the runtime version are `0.4.0`. Signed annotated tag object
 `a14a73475e56192b499c7470a234bf4c2cc415ae` peels to the v0.4 release
@@ -95,8 +107,8 @@ baseline. The historical `v0.3.0` tag remains unchanged.
 `flake.lock` and GitHub Actions pin:
 
 ```text
-5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb
-sha256-rgphrPDofHaCxe/Vk87wGuUovh4vvM3t0FcQdoSy+0E=
+974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8
+sha256-Xvq6W1zaDTqpMVh0DltoM6pYNiUcDkyY5bswbH0Mqs8=
 ```
 
 The persistent Asterinas seam PRs are merged in `chinrw/asterinas`:
@@ -107,6 +119,7 @@ The persistent Asterinas seam PRs are merged in `chinrw/asterinas`:
 | #3 `syssec-fd-protocol` | `5eb921ef74cbd397118270c2e27b38bac4103ff8` | reserved FD protocol and Loom model |
 | #4 `syssec-runtime-harness` | `da81ae952e245b6bb60229457f090575c4fe97f6` | isolated guest case runner and partial-EFAULT case |
 | #6 `syssec-cmsg-uapi` | `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb` | checked `cmsghdr` layout/parser seam, Kani, Miri, and fuzz |
+| #8 `syssec-msghdr-uapi` | `974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8` | `user_msghdr` layout, signed name length, iovec bound, Kani, and Miri |
 
 `chinrw/asterinas` PR #5 merged as
 `fdb34332d9de81d39e5a4cb4c5077446018b27bb`. It adds target-specific static
@@ -118,11 +131,16 @@ The content head is the merge commit's second parent and is reachable from
 
 `chinrw/asterinas` PR #6 merged as
 `74f1a483962c894f4350967b2c1f0e8d35d7f245`. Its signed content head is the
-current aster-syssec pin `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb` and is
+control-message content revision `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb`
+and is reachable from `chinrw/asterinas/main`.
+
+`chinrw/asterinas` PR #8 passed all 42 reported checks and merged as
+`d94f69ac8aa62c3b44ee1fc161c6419d6c655b74`. Its signed content head is the
+current aster-syssec pin `974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8` and is
 reachable from `chinrw/asterinas/main`.
 
-The current pin descends from the merged runtime stack and adds the
-control-message UAPI seam. Update `flake.lock`, both workflow checkouts,
+The current pin descends from the merged runtime stack and adds the control-
+and message-header UAPI seams. Update `flake.lock`, both workflow checkouts,
 checkout preflight, validation evidence, and this snapshot together whenever
 the pin changes. Tests bind both workflow refs to the locked revision.
 
@@ -423,26 +441,27 @@ hashed artifacts.
 
 The v0.3 Host Verification baseline was executed on clean aster-syssec
 `5f8f38c` and Asterinas `490960ace`. `VALIDATION.md` records the environment
-and result bounds. The current pinned Asterinas revision is `5e3f8ef5...`.
+and result bounds. The current pinned Asterinas revision is `974e1bad...`.
 
 The post-v0.4 Host extension passed clean local PR and nightly profiles on
-Asterinas `5e3f8ef5...`. The current registry contains eight Kani, two Miri,
-three layout, two fuzz, and one Loom target. PR #17 run `33054763312` passed
+Asterinas `974e1bad...`. The current registry contains ten Kani, three Miri,
+three layout, two fuzz, and one Loom target. PR #19 run `33062684112` passed
 both remote jobs after the Host and Runtime workflow refs were bound to
-`flake.lock`. Manual main run `33057517578` then passed the complete 16-target
-nightly profile and produced the independently verified evidence pack recorded
-above.
+`flake.lock`. Main run `33066250182` then passed the complete 19-target nightly
+profile and produced the independently verified evidence pack recorded above.
 
-Manual Runtime run `33055916200` then passed all four stages on merged main and
-the same Asterinas pin. Pipeline `RUNTIME-PIPELINE-2AAC2AB2DD4DB13A` produced
-normal Asterinas and Linux results for the exact `696ed3...7089` static binary.
-Comparison `ORACLE-COMPARISON-6E7E057406AE0C1A` matched all seven declared
+Manual Runtime run `33066252308` passed all four stages on merged main and the
+same Asterinas pin. Pipeline `RUNTIME-PIPELINE-0304FD0DA7CE9812` produced normal
+Asterinas and Linux results for the exact `696ed3...7089` static binary.
+Comparison `ORACLE-COMPARISON-145A977B01CEA804` matched all seven declared
 fields and retained `disposition=baseline`. The verified evidence pack retained
-32 files and 16,524,561 bytes with content SHA-256
-`ea67f513a13ca36de0c754e75e57ed433feca815d2fd81223ecc32c0c196f542`.
+32 files and 16,524,605 bytes with content SHA-256
+`42ef5822be32e1446fc777f86fedd4d45c94a10e145192cf6ef14bea5022d377`.
 Runtime execution and evidence packing used Nix offline and recorded no
-downloads or Nix-store copies. `docs/runtime-baseline-2026-08-27.md` binds the
-inputs, stage results, provenance, comparison, and downloaded artifact hashes.
+downloads or Nix-store copies. Six result artifacts and the run manifest passed
+their pinned schema and integrity checks after download.
+`docs/runtime-baseline-2026-08-27.md` binds the inputs, stage results,
+provenance, comparison, and downloaded artifact hashes.
 
 The PR #9 tree passed the locked package gate with 132 tests, the packer shell
 contract, Ruff, formatting, Pyright, schema validation, Actionlint, and
@@ -588,9 +607,8 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Extend low-risk ABI helpers and targets: `CUserMsgHdr`, `msg_namelen`
-   signedness, `msg_iovlen` bounds, timespec ranges, sigset size, and mmap
-   arithmetic.
+1. Extend low-risk ABI helpers and targets: timespec ranges, sigset size, and
+   mmap/mremap range arithmetic.
 2. Add phase-specific Specula execution, hash-bound gates, and candidate-only
    result import in the model lane.
 3. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
