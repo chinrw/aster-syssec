@@ -34,8 +34,11 @@ class PackagedProfileTests(unittest.TestCase):
                 "cmsg-alignment-no-wrap",
                 "cmsg-parser-progress",
                 "cmsg-payload-round-trip",
+                "message-name-length-signedness",
+                "message-iovec-count-limit",
                 "user-iovec-layout",
                 "control-message-header-layout",
+                "user-message-header-layout",
                 "user-iovec-x86-64",
                 "fd-reservation-visibility",
             ),
@@ -307,7 +310,7 @@ class TargetCliTests(unittest.TestCase):
     ) -> None:
         targets = load_target_registry(load_registry())
 
-        self.assertEqual(len(targets.targets), 16)
+        self.assertEqual(len(targets.targets), 19)
         self.assertEqual(
             {target.engine for target in targets.targets.values()},
             {"fuzz", "kani", "layout", "loom", "miri"},

@@ -14,6 +14,39 @@ Lab boundary and packer shell contracts, Ruff, formatting, Pyright, JSON Schema
 validation, Actionlint, and ShellCheck. `nix run . -- --version` and
 `nix run .#syssec-lab -- --version` both reported `0.4.0`.
 
+## Post-v0.4 message-header Host extension
+
+Asterinas commit `974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8` moves the
+Linux `user_msghdr` layout and pure signed-name-length and iovec-count
+validation into the production `aster-uapi` seam. `aster-core` retains user
+memory access and errno mapping. The flake pins that commit with NAR hash
+`sha256-Xvq6W1zaDTqpMVh0DltoM6pYNiUcDkyY5bswbH0Mqs8=`.
+
+The Host registry now contains 19 core targets: ten Kani proofs, three Miri
+tests, three bare-metal layout targets, two bounded fuzz targets, and one Loom
+model. Checkout preflight reported 19 targets and zero issues. Both local
+profiles passed against the clean Asterinas commit:
+
+- `pr`: three reviewer commands and all 15 blocking targets passed; result
+  SHA-256 `5fae22d50cd931d33b1f4c2ee7495346ce372eb3ecdfbab43e2d470d6f48b5d0`;
+- `nightly`: two reviewer commands and all 19 targets passed; result SHA-256
+  `8e6507da325ce118db6395d82ee16afd1399ac6180d930871a022cb9b20c3ecd`.
+
+The two new Kani proofs cover signed `msg_namelen` handling and the Linux iovec
+count limit. The exact Miri test covers x86-64 `user_msghdr` layout and
+initialized padding. The verified nightly evidence pack retained 135 files and
+1,390,717 bytes with content SHA-256
+`5de6971be9d11113abe6c19a11c419a48e106eee831bb7e2c87f79d823364603`.
+
+The combined vendor output rebuilt offline from the fixed Asterinas workspace
+and `nightly-2026-07-21` Rust-library inputs. Their hashes remain
+`sha256-BCSyswj+Q1wm6M/XthjZfgjj43tAtmRvhCD4V0ygjCc=` and
+`sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=`. The locked flake gate
+passed with 161 tests, both packages, the Lab boundary, schema and workflow
+checks, Ruff, formatting, Pyright, Actionlint, and ShellCheck. The Runtime
+workflow now selects the same Asterinas commit; the current real dual-VM result
+below remains the previous pin until the remote Runtime baseline is rerun.
+
 ## Post-v0.4 control-message Host extension
 
 Asterinas commit `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb` moves the
