@@ -1,6 +1,6 @@
 # Agent handoff
 
-Snapshot: 2026-08-26
+Snapshot: 2026-08-27
 
 Use this document when continuing Host Verification, Runtime Foundation,
 syscall analysis, or Specula integration. Refresh the repository identities
@@ -46,22 +46,22 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 
 | State | Revision | Scope |
 | --- | --- | --- |
-| merged `main` | `6d0c65b` | PR #1-#7: Host Verification, Runtime Foundation, binary export, bounded CI evidence, and current handoff |
+| merged `main` | `f2f431c` | PR #1-#9: Host Verification, Runtime Foundation, binary export, pinned Linux oracle, and the first real differential baseline |
 | signed tag `v0.3.0` | `421c9d9` | v0.3 Host Verification record |
 
-All six aster-syssec PRs are merged. PR #6 head
-`51ab61366c43f060193d47452e7ef48e09871189` passed `validate` and
-`host-verification`; merge commit `b26364a64b9ee9009e4765981eb3aacefc9d40c5`
+All nine aster-syssec PRs are merged. PR #9 head
+`c47ac40e3ae27c4575a539bc6a3a2bbed41518c6` passed `validate` and
+`host-verification`; merge commit `f2f431c47430b308bfec406a54b745fdb89d712b`
 is the current public baseline.
 
-Main push run `32936798988` completed successfully on that merge commit. Both
+Main push run `32953069193` completed successfully on that merge commit. Both
 `validate` and the PR-profile `host-verification` job passed.
 
-Manual workflow run `32930891820` executed the `nightly` profile on the PR #6
-head. All 11 targets passed and `failed_targets` was empty. Its verified pack
-contained 87 files and 1,173,048 uncompressed bytes; the uploaded GitHub
-artifact was 142,523 bytes. The previous scheduled artifact was
-1,136,398,829 bytes because it included cache and build trees.
+Scheduled run `33004803564` executed the `nightly` profile on the same merge
+commit and passed. The nightly profile contains all 11 packaged Host targets.
+The bounded evidence pack remains enabled; the earlier manual validation of
+that pack contained 87 files and 1,173,048 uncompressed bytes, compared with
+the pre-fix 1,136,398,829-byte artifact that included cache and build trees.
 
 The package version remains `0.3.0`. Runtime work has not changed the release
 tag.
@@ -376,12 +376,14 @@ hashed artifacts.
 
 ## Executed evidence
 
-Host Verification was executed on clean aster-syssec `5f8f38c` and Asterinas
-`490960ace`. `VALIDATION.md` records the environment and result bounds.
+The v0.3 Host Verification baseline was executed on clean aster-syssec
+`5f8f38c` and Asterinas `490960ace`. `VALIDATION.md` records the environment
+and result bounds. The current pinned Asterinas revision is `d0bddbf...`.
 
-The PR #6 tree passed the locked package gate with 105 tests, Ruff, formatting,
-Pyright, schema validation, Actionlint, and ShellCheck. PR #6 and its manual
-nightly run passed both remote CI jobs.
+The PR #9 tree passed the locked package gate with 132 tests, the packer shell
+contract, Ruff, formatting, Pyright, schema validation, Actionlint, and
+ShellCheck. PR #9, its main push run, and the next scheduled nightly run passed
+both remote CI jobs.
 
 One offline, network-disabled TCG smoke ran against Asterinas
 `da81ae952e245b6bb60229457f090575c4fe97f6`. It completed in 131.5 seconds and
@@ -403,9 +405,10 @@ copy were byte-identical at SHA-256
 The case source SHA-256 was
 `374f9297db7164ecbc7c8bb2e0f3e5b37478ddd8b16aba1d5c8309619eeeebda`.
 Provenance resolved GCC 14.2.1 and GNU ld 2.44 from the Nix derivation. ELF
-evidence contained no interpreter or dynamic-library dependency. This proves
-export and provenance only; neither VM differential execution nor comparison
-was performed.
+evidence contained no interpreter or dynamic-library dependency. Export alone
+proves provenance only; the later baseline then verified the same binary in
+both VMs and produced the matching comparison recorded in
+`docs/runtime-baseline-2026-08-26.md`.
 
 ## Safety lanes
 

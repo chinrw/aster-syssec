@@ -1,8 +1,8 @@
 # Validation
 
-## Current static-binary candidate
+## Current runtime baseline
 
-The 2026-08-26 candidate pins Asterinas
+The 2026-08-26 baseline pins Asterinas
 `d0bddbf56d893221d103a0c3330f379dc59977b9` with NAR hash
 `sha256-eUJRAbB3KLNJTWB20lgIE+YeBSbaV9aNq8Q98w9YJaY=`. That revision adds
 target-specific static linking for `partial_efault_json` on top of the merged
@@ -14,40 +14,36 @@ at SHA-256
 The source SHA-256 was
 `374f9297db7164ecbc7c8bb2e0f3e5b37478ddd8b16aba1d5c8309619eeeebda`.
 The derivation resolved GCC 14.2.1 and GNU ld 2.44. `readelf` reported no
-interpreter and no dynamic-library dependencies.
+interpreter and no dynamic-library dependencies. The same binary was then
+verified and executed in Asterinas and the pinned Linux oracle. The seven-field
+partial-EFAULT comparison produced `status=match` and
+`disposition=baseline`.
 
-This validates binary export and provenance only. It does not supply Linux VM
-execution or differential comparison.
-
-The candidate passed:
+The final PR #9 tree passed:
 
 ```text
-nix flake check: 21 checks passed
-unit tests: 95 passed
-focused Runtime Foundation tests: 40 passed
+nix flake check: passed
+unit tests: 132 passed
+packer shell contract: passed
 Ruff lint and format: passed
 Pyright: passed
 JSON Schema metaschema validation: passed
 Actionlint: passed
 ShellCheck: passed
-config-check: 0 issues
-inventory --check: 250 syscalls, 0 errors
-targets check: 11 targets, 0 issues
 ```
 
 ## Current CI and nightly baseline
 
-aster-syssec PR #6 merged as
-`b26364a64b9ee9009e4765981eb3aacefc9d40c5`. Its PR checks passed against
-head `51ab61366c43f060193d47452e7ef48e09871189`. Main push run `32936798988`
+aster-syssec PR #9 merged as
+`f2f431c47430b308bfec406a54b745fdb89d712b`. Its PR checks passed against
+head `c47ac40e3ae27c4575a539bc6a3a2bbed41518c6`. Main push run `32953069193`
 then passed both `validate` and `host-verification` on the merge commit.
 
-Manual workflow run `32930891820` selected the `nightly` profile and executed
-all 11 targets against pinned Asterinas
-`d0bddbf56d893221d103a0c3330f379dc59977b9`. Every expected outcome was met;
-`failed_targets` was empty.
+Scheduled run `33004803564` selected the `nightly` profile on the same merge
+commit and passed. The profile executed all 11 packaged targets against pinned
+Asterinas `d0bddbf56d893221d103a0c3330f379dc59977b9`.
 
-The run's verified evidence pack contained 87 files and 1,173,048
+The earlier manual pack validation contained 87 files and 1,173,048
 uncompressed bytes. GitHub stored it as a 142,523-byte artifact. The previous
 scheduled run `32880127358` uploaded 1,136,398,829 bytes and 99,903 ZIP entries
 because the whole work root included cache and build trees.
