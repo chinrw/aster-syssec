@@ -32,7 +32,7 @@ class RuntimeWorkflowTests(unittest.TestCase):
 
     def test_runtime_inputs_are_immutable_and_networkless(self) -> None:
         self.assertIn(
-            "ref: d0bddbf56d893221d103a0c3330f379dc59977b9",
+            "ref: 5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb",
             self.workflow,
         )
         self.assertIn(

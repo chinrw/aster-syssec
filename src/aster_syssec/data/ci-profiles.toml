@@ -9,7 +9,11 @@ targets = [
   "iovec-entry-address-no-wrap",
   "iovec-supported-index-offset",
   "iovec-truncation-budget",
+  "cmsg-alignment-no-wrap",
+  "cmsg-parser-progress",
+  "cmsg-payload-round-trip",
   "user-iovec-layout",
+  "control-message-header-layout",
   "user-iovec-x86-64",
   "fd-reservation-visibility",
 ]
@@ -30,11 +34,16 @@ targets = [
   "iovec-entry-address-no-wrap",
   "iovec-supported-index-offset",
   "iovec-truncation-budget",
+  "cmsg-alignment-no-wrap",
+  "cmsg-parser-progress",
+  "cmsg-payload-round-trip",
   "user-iovec-layout",
+  "control-message-header-layout",
   "user-iovec-x86-64",
   "user-iovec-riscv64",
   "user-iovec-loongarch64",
   "iovec-host-fuzz",
+  "cmsg-host-fuzz",
   "fd-reservation-visibility",
 ]
 external_required = [

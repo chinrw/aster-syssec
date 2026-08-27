@@ -1,0 +1,24 @@
+version = 1
+id = "cmsg-alignment-no-wrap"
+engine = "kani"
+track = "socket-cmsg-iovec"
+properties = ["BOUNDARY-VALIDATION", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+harness = "proof_control_message_alignment_does_not_wrap"
+source_symbols = ["ControlMessageLayout", "CONTROL_MESSAGE_ALIGNMENT"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+unwind = 8
+
+[policy]
+expected = "pass"
+pr_blocking = true

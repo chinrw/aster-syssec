@@ -31,7 +31,11 @@ class PackagedProfileTests(unittest.TestCase):
                 "iovec-entry-address-no-wrap",
                 "iovec-supported-index-offset",
                 "iovec-truncation-budget",
+                "cmsg-alignment-no-wrap",
+                "cmsg-parser-progress",
+                "cmsg-payload-round-trip",
                 "user-iovec-layout",
+                "control-message-header-layout",
                 "user-iovec-x86-64",
                 "fd-reservation-visibility",
             ),
@@ -303,7 +307,7 @@ class TargetCliTests(unittest.TestCase):
     ) -> None:
         targets = load_target_registry(load_registry())
 
-        self.assertEqual(len(targets.targets), 11)
+        self.assertEqual(len(targets.targets), 16)
         self.assertEqual(
             {target.engine for target in targets.targets.values()},
             {"fuzz", "kani", "layout", "loom", "miri"},
