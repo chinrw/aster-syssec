@@ -3,17 +3,17 @@
     "asterinas-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1787818674,
-        "narHash": "sha256-rgphrPDofHaCxe/Vk87wGuUovh4vvM3t0FcQdoSy+0E=",
+        "lastModified": 1787825158,
+        "narHash": "sha256-Xvq6W1zaDTqpMVh0DltoM6pYNiUcDkyY5bswbH0Mqs8=",
         "owner": "chinrw",
         "repo": "asterinas",
-        "rev": "5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb",
+        "rev": "974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8",
         "type": "github"
       },
       "original": {
         "owner": "chinrw",
         "repo": "asterinas",
-        "rev": "5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb",
+        "rev": "974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8",
         "type": "github"
       }
     },

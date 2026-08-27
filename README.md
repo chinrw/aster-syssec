@@ -36,7 +36,7 @@ Current `main` implements:
 - verified evidence packing with explicit byte and file budgets;
 - manually selectable PR and nightly CI profiles with per-target summaries.
 
-The bundled vertical slice contains eight Kani proofs, two Miri tests, three
+The bundled vertical slice contains ten Kani proofs, three Miri tests, three
 bare-metal layout targets, two cargo-fuzz targets, and one Loom model. These
 targets require their matching production helper packages in the Asterinas
 checkout; `targets check` fails before execution when the package, symbol,
