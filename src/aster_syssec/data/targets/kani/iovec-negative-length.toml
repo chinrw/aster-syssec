@@ -7,6 +7,13 @@ package = "aster-uapi"
 harness = "proof_negative_iovec_length_is_rejected"
 source_symbols = ["UserIoVec"]
 
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
 [limits]
 timeout_seconds = 300
 memory_bytes = 8589934592

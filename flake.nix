@@ -67,6 +67,7 @@
               ./flake.lock
               ./flake.nix
               ./nix
+              ./packages
               ./pyproject.toml
               ./schemas
               ./scripts
@@ -174,13 +175,13 @@
             doCheck = true;
             checkPhase = ''
               runHook preCheck
-              export PYTHONPATH="$PWD/src:${pythonEnv}/${python.sitePackages}"
+              export PYTHONPATH="$PWD/src:$PWD/packages/aster-syssec-lab/src:${pythonEnv}/${python.sitePackages}"
               ${pythonEnv.interpreter} -m unittest discover -v
               SYSSEC_INITRAMFS_PACKER=${linuxOracle.packer}/bin/syssec-initramfs-packer \
                 bash tests/test_linux_oracle_packer.sh
-              ruff check src tests
-              ruff format --check src tests
-              pyright src tests
+              ruff check src tests packages/aster-syssec-lab/src
+              ruff format --check src tests packages/aster-syssec-lab/src
+              pyright src tests packages/aster-syssec-lab/src
               check-jsonschema --check-metaschema schemas/*.json
               actionlint .github/workflows/*.yml
               shellcheck scripts/*.sh tests/*.sh
@@ -192,6 +193,25 @@
               description = "Evidence-first Asterinas syscall security reviewer";
               license = lib.licenses.mpl20;
               mainProgram = "syssec";
+              platforms = [ "x86_64-linux" ];
+            };
+          };
+
+          syssecLab = python.pkgs.buildPythonApplication {
+            pname = "aster-syssec-lab";
+            version = "0.3.0";
+            pyproject = true;
+            src = ./packages/aster-syssec-lab;
+
+            build-system = [ python.pkgs.setuptools ];
+            dependencies = [ syssec ];
+            doCheck = false;
+            pythonImportsCheck = [ "aster_syssec_lab" ];
+
+            meta = {
+              description = "Authorization-gated Lab boundary for aster-syssec";
+              license = lib.licenses.mpl20;
+              mainProgram = "syssec-lab";
               platforms = [ "x86_64-linux" ];
             };
           };
@@ -325,12 +345,14 @@
             rustToolchain
             syssec
             syssecDev
+            syssecLab
             syzkaller
             ;
 
           packages = {
             default = syssec;
             inherit syssec;
+            aster-syssec-lab = syssecLab;
             kani-installer = kaniInstaller;
             kani-setup = kaniSetup;
             linux-oracle-bundle = linuxOracle.bundle;
@@ -340,6 +362,25 @@
 
           checks = {
             package = syssec;
+            lab-package = syssecLab;
+            lab-boundary-contract =
+              pkgs.runCommand "aster-syssec-lab-boundary-contract"
+                {
+                  nativeBuildInputs = [
+                    pkgs.jq
+                    syssecLab
+                  ];
+                }
+                ''
+                  mkdir -p "$out"
+                  syssec-lab boundary --json > "$out/boundary.json"
+                  jq -e '
+                    .safety_class == "lab" and
+                    .execution_available == false and
+                    .authorization_required == true and
+                    .network == "off"
+                  ' "$out/boundary.json" >/dev/null
+                '';
             kani-installer = kaniInstaller;
             linux-oracle-bundle = linuxOracle.bundle;
             inherit syzkaller;
@@ -387,6 +428,12 @@
             type = "app";
             program = lib.getExe syssec;
             meta.description = "Run the packaged aster-syssec CLI";
+          };
+
+          apps.syssec-lab = {
+            type = "app";
+            program = lib.getExe syssecLab;
+            meta.description = "Validate the aster-syssec Lab boundary";
           };
 
           formatter = pkgs.nixfmt;

@@ -1,6 +1,7 @@
 version = 1
 
 [profiles.pr]
+safety_class = "core"
 implemented_commands = ["config-check", "inventory --check", "review --changed-from"]
 targets = [
   "iovec-negative-length",
@@ -21,6 +22,7 @@ external_required = ["make check", "targeted regression", "known reproducer repl
 fail_fast = true
 
 [profiles.nightly]
+safety_class = "core"
 implemented_commands = ["inventory --check", "review"]
 targets = [
   "iovec-negative-length",
@@ -41,6 +43,7 @@ external_required = [
 fail_fast = false
 
 [profiles.weekly]
+safety_class = "model"
 implemented_commands = ["model --stage analysis"]
 external_required = [
   "human Gate 1 review", "kernel sequence fuzzing", "xfstests",
@@ -48,6 +51,7 @@ external_required = [
 ]
 
 [profiles.release]
+safety_class = "core"
 implemented_commands = ["inventory --check --baseline"]
 external_required = [
   "confirmed reproducer replay", "regression promotion audit",

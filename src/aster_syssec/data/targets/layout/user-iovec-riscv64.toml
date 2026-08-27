@@ -12,6 +12,13 @@ section = ".syssec.layout"
 endianness = "little"
 source_symbols = ["UserIoVec", "USER_IOVEC_LAYOUT"]
 
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
 [expected_layout]
 pointer_width = 64
 size = 16

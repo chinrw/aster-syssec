@@ -62,6 +62,13 @@ class RuntimeSchemaTests(unittest.TestCase):
                 "LINUX-ABI-CONTRACT",
             ],
             "source_symbols": ["SYS_read", "readv"],
+            "safety": {
+                "class": "core",
+                "agent_mode": "allowed",
+                "network": False,
+                "may_generate_reproducer": False,
+                "requires_authorization": False,
+            },
             "oracle": "linux-x86-64",
             "comparator": "partial-efault-pipe-read-v1",
             "limits": {

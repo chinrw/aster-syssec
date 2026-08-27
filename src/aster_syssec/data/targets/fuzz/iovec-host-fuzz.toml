@@ -11,6 +11,13 @@ max_input_size = 32
 sanitizer = "none"
 source_symbols = ["UserIoVec", "truncate_iovec_len", "iovec_entry_addr"]
 
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
 [limits]
 timeout_seconds = 300
 memory_bytes = 8589934592

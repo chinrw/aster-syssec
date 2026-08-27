@@ -416,14 +416,20 @@ Keep work in three execution contexts:
 
 | Lane | Repository role | Allowed output |
 | --- | --- | --- |
-| core | this repository | inventory, proofs, schemas, parsers, VM/process infrastructure, comparison evidence |
-| model | separate analysis context | state variables, transitions, invariants, bounds, source anchors, candidate traces |
-| lab | authorization-gated local/private environment | fault plans, runtime confirmation, reproducers, impact assessment |
+| core | main `aster-syssec` package | inventory, proofs, schemas, parsers, VM/process infrastructure, comparison evidence |
+| model | explicit model entrypoint | state variables, transitions, invariants, bounds, source anchors, candidate traces |
+| lab | same repository, separate `aster-syssec-lab` package | authorization validation; future gated VM-only operations |
 
-The `core`, `model`, and `lab` safety classification proposed for target
-configuration is not implemented. The main CLI does not enforce these lanes.
-Treat the table as an operating boundary until configuration and schema support
-land.
+Verification and Runtime targets carry a schema-validated safety policy. The
+main `syssec` execution paths only accept `core`: model targets require the
+explicit model entrypoint and Lab targets fail closed. Profiles declare one
+safety class and cannot select targets from another class.
+
+The separately packaged `syssec-lab` command validates authorization documents
+and reports its fixed VM-only, network-off, manual-only boundary. It does not
+yet execute Lab cases. `.github/workflows/lab.yml` is manual-only and verifies
+that package boundary; ordinary PR, push, scheduled, and release profiles
+cannot invoke it.
 
 Specula currently prepares dry-run or analysis handoffs. It does not execute
 phase gates, import counterexamples, or generate runtime requests. Keep model
@@ -489,12 +495,11 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Add `core`, `model`, and `lab` safety classes.
-2. Register runtime targets and expose execution through an explicit CLI/profile.
-3. Reproduce the runtime baseline in CI and retain a verified evidence pack.
-4. Extend low-risk ABI helpers and targets: message headers, control-message
+1. Register runtime targets and expose execution through an explicit CLI/profile.
+2. Reproduce the runtime baseline in CI and retain a verified evidence pack.
+3. Extend low-risk ABI helpers and targets: message headers, control-message
    alignment/parser progress, timespec ranges, sigset size, and mmap arithmetic.
-5. Add phase-specific Specula execution, hash-bound gates, and candidate-only
+4. Add phase-specific Specula execution, hash-bound gates, and candidate-only
    result import in the model lane.
-6. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
+5. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
    only in the authorization-gated lab.

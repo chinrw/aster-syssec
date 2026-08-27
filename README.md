@@ -10,7 +10,7 @@ Specula integration should start with the
 [current agent handoff](docs/agent-handoff.md). It separates merged, open-PR,
 executed, schema-only, and planned work.
 
-Version 0.3 implements:
+Current `main` implements:
 
 - three-architecture syscall dispatch inventory;
 - handler signature, SCML, regression-source, and track reconciliation;
@@ -31,6 +31,8 @@ Version 0.3 implements:
 - isolated Asterinas QEMU execution with normalized runtime results;
 - exact initramfs static-binary export with Nix, compiler, and linker provenance;
 - pinned, networkless Linux QEMU execution of an existing exported binary;
+- a case-specific partial-EFAULT Asterinas/Linux comparator;
+- fail-closed `core`, `model`, and `lab` target safety policies;
 - verified evidence packing with explicit byte and file budgets;
 - manually selectable PR and nightly CI profiles with per-target summaries.
 
@@ -40,10 +42,10 @@ targets require their matching production helper packages in the Asterinas
 checkout; `targets check` fails before execution when the package, symbol,
 harness, test, or fuzz target is absent.
 
-Version 0.3 does not implement Asterinas/Linux comparison, fault injection,
-kernel sequence fuzzing, Specula phase gates, or finding promotion. Engine and
-runtime results remain evidence inputs and cannot become confirmed findings
-through the current CLI.
+The current CLI does not orchestrate Runtime targets, execute Lab cases, run
+kernel sequence fuzzing, enforce Specula phase gates, or promote findings.
+Engine and runtime results remain evidence inputs and cannot become confirmed
+findings through the current CLI.
 
 ## Install
 
@@ -56,7 +58,12 @@ The preferred development path is the locked Nix flake:
 nix develop                 # reviewer development
 nix develop .#formal        # Rust/Miri/Kani installer/fuzz/Specula prerequisites
 nix develop .#kernel-fuzz   # formal shell plus Go/QEMU/syzkaller
+nix run .#syssec-lab -- boundary --json
 ```
+
+`syssec-lab` is a separate package in this repository. Its initial CLI only
+validates authorization documents and reports the Lab boundary; it cannot
+execute a Lab case.
 
 The default flake input reads the Rust channel, components, and targets from
 Asterinas revision `d0bddbf56d893221d103a0c3330f379dc59977b9`. Override it

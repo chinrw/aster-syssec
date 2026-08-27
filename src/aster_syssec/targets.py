@@ -10,6 +10,7 @@ from typing import Any
 
 from .config import Registry
 from .rust_source import mask_non_code
+from .safety import SafetyPolicy
 from .schemas import validate_instance
 
 
@@ -33,6 +34,7 @@ class VerificationTarget:
     track: str
     properties: tuple[str, ...]
     source_symbols: tuple[str, ...]
+    safety: SafetyPolicy
     limits: TargetLimits
     policy: TargetPolicy
     configuration: dict[str, Any]
@@ -45,6 +47,7 @@ class VerificationTarget:
             "engine": self.engine,
             "track": self.track,
             "properties": list(self.properties),
+            "safety": self.safety.summary(),
             "expected": self.policy.expected,
             "pr_blocking": self.policy.pr_blocking,
         }
@@ -125,6 +128,7 @@ def load_target_registry(
             track=track.id,
             properties=tuple(item["properties"]),
             source_symbols=tuple(item["source_symbols"]),
+            safety=SafetyPolicy.from_mapping(item["safety"]),
             limits=TargetLimits(
                 timeout_seconds=limits["timeout_seconds"],
                 memory_bytes=limits["memory_bytes"],

@@ -81,6 +81,24 @@ The final tree passed the locked flake gate with 132 tests, the packer shell
 contract, Ruff lint and format, Pyright, JSON Schema validation, Actionlint,
 and ShellCheck.
 
+## Safety and Lab boundary validation
+
+The target safety change makes `core`, `model`, and `lab` explicit and
+fail-closed. All 11 packaged Host targets and the partial-EFAULT Runtime target
+declare `core`. PR, nightly, and release profiles are core-only; the weekly
+profile is model-only. A profile cannot select a target from another class.
+
+The main `syssec` execution path rejects model targets in favor of the explicit
+model entrypoint and rejects Lab targets before creating a run. The separate
+`aster-syssec-lab` package has a one-way dependency on the core package. Its
+initial CLI validates an expiring authorization document and reports a
+VM-only, network-off, manual-only boundary with `execution_available=false`.
+
+`.github/workflows/lab.yml` has only a manual trigger and only builds and checks
+the boundary package. It does not execute a Lab case. The locked flake gate
+passed with 145 tests, the Lab package and boundary contract, Ruff, formatting,
+Pyright, JSON Schema validation, Actionlint, and ShellCheck.
+
 ## v0.3 Host Verification baseline
 
 Observed on 2026-08-24 against clean revisions:
