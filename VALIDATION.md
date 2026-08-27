@@ -63,6 +63,55 @@ and compressed size 192,236 bytes. The downloaded pack contained 135 files and
 recomputed content SHA-256 matched
 `f0fd6aefcb1e15cacaa83dc9c5e0cf592fccadabc1d67d63c957ef24387d2260`.
 
+## Post-v0.4 timespec Host extension
+
+Asterinas commit `820ec6464809071779f3c386634befcc83da10bc` moves the
+Linux 64-bit userspace timespec layout and pure duration-range validation into
+the production `aster-uapi` seam. `aster-core` retains user memory access,
+`UTIME_NOW` and `UTIME_OMIT` handling, and errno mapping. The flake pins that
+commit with NAR hash
+`sha256-UAenN/jXYpPthwCRWN6ePbbUIKMv7V59ZCOPwk0+BqY=`.
+
+The Host registry now contains 22 core targets: twelve Kani proofs, four Miri
+tests, three bare-metal layout targets, two bounded fuzz targets, and one Loom
+model. Checkout preflight against the preceding public Asterinas main commit
+failed closed with 12 missing-symbol or missing-harness issues. Preflight
+against `820ec646...` reported 22 targets and zero issues, with registry hash
+`011e5ff6b1be40e0fed6a421811ab6fedc1b2e1f9da458a29e7a035cb90127f4`.
+
+Both local profiles passed against the clean Asterinas commit:
+
+- `pr`: three reviewer commands and all 18 blocking targets passed; result
+  SHA-256 `e913b4b361a6cfabd8ca534f4243af15d143dad85a551c3b3d5798bc257b5158`;
+- `nightly`: two reviewer commands and all 22 targets passed; result SHA-256
+  `e1a7aa531a4cf83ddaa12133ce3ab01c73081cac71fabcfaad3933ed52114cdd`.
+
+The two new Kani proofs cover nonnegative seconds and nanoseconds in
+`0..1_000_000_000`. The exact Miri test covers the Linux 64-bit layout. Native
+x86-64, LoongArch64, and RISC-V bare-metal checks passed; the RISC-V check used
+the exact `nightly-2026-07-21` compiler and the combined fixed vendor with
+`-Zbuild-std=core --offline`. Both existing fuzz targets completed 1000/1000
+runs after their locked public dependencies were populated into the isolated
+Host cache; target execution remained offline.
+
+The nightly evidence pack verified one manifest and retained 153 files and
+1,530,304 bytes, with content SHA-256
+`1c2e3dbccb05555f8a04de135929350b58f5fa0af000a3e6c91265b16f3e20fc`.
+The combined vendor rebuilt offline at the unchanged fixed hashes:
+
+- Asterinas workspace:
+  `sha256-BCSyswj+Q1wm6M/XthjZfgjj43tAtmRvhCD4V0ygjCc=`;
+- pinned Rust `library/Cargo.lock`:
+  `sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=`.
+
+The locked flake gate passed with 161 tests, both packages, the Lab boundary,
+the initramfs packer contract, Ruff, formatting, Pyright, JSON Schema
+validation, Actionlint, and ShellCheck.
+
+Nix may fetch those public, lock-bound inputs while materializing the vendor.
+The Runtime container and both Asterinas and Linux QEMU guests remain
+network-off.
+
 ## Post-v0.4 control-message Host extension
 
 Asterinas commit `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb` moves the

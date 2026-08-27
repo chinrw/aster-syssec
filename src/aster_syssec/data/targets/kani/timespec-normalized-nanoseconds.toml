@@ -1,0 +1,27 @@
+version = 1
+id = "timespec-normalized-nanoseconds"
+engine = "kani"
+track = "abi-integer-layout"
+properties = ["BOUNDARY-VALIDATION", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+harness = "proof_timespec_nanoseconds_are_normalized"
+source_symbols = [
+  "CUserTimespec", "NANOSECONDS_PER_SECOND", "TimespecError",
+  "validated_duration",
+]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+unwind = 8
+
+[policy]
+expected = "pass"
+pr_blocking = true

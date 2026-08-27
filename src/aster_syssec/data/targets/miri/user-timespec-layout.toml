@@ -1,0 +1,24 @@
+version = 1
+id = "user-timespec-layout"
+engine = "miri"
+track = "abi-integer-layout"
+properties = ["NO-UNINITIALIZED-COPYOUT", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+test = "user_timespec_layout_matches_the_linux_abi"
+target_triple = "x86_64-unknown-linux-gnu"
+source_symbols = ["CUserTimespec", "USER_TIMESPEC_LAYOUT"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+
+[policy]
+expected = "pass"
+pr_blocking = true
