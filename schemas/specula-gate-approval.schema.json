@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/specula-gate-approval.schema.json",
+  "title": "Human approval for one hash-bound Specula gate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "gate_id",
+    "gate",
+    "request_path",
+    "request_sha256",
+    "decision",
+    "approved_by",
+    "approved_at",
+    "notes"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "specula-gate-approval" },
+    "gate_id": { "type": "string", "pattern": "^SPECULA-GATE-[0-9A-F]{16}$" },
+    "gate": { "enum": ["analysis", "spec", "trace", "counterexample-mapping"] },
+    "request_path": { "type": "string", "minLength": 1 },
+    "request_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "decision": { "enum": ["approved", "rejected"] },
+    "approved_by": { "type": "string", "minLength": 1 },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "notes": { "type": "string" }
+  }
+}

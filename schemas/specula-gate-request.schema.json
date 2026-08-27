@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/specula-gate-request.schema.json",
+  "title": "Hash-bound Specula human gate request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "kind",
+    "gate_id",
+    "gate",
+    "safety_class",
+    "created_at",
+    "track",
+    "phase",
+    "handoff",
+    "source",
+    "artifact_checkout",
+    "workspace",
+    "artifacts",
+    "artifact_set_sha256",
+    "previous_approval"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "kind": { "const": "specula-gate-request" },
+    "gate_id": { "$ref": "#/$defs/gateId" },
+    "gate": { "$ref": "#/$defs/gate" },
+    "safety_class": { "const": "model" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "track": { "type": "string", "minLength": 1 },
+    "phase": { "enum": ["analyze", "specgen", "harness", "validate"] },
+    "handoff": { "$ref": "#/$defs/boundFile" },
+    "source": { "$ref": "#/$defs/sourceIdentity" },
+    "artifact_checkout": { "$ref": "#/$defs/source" },
+    "workspace": { "type": "string", "minLength": 1 },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "logical_path", "role", "sha256", "size"],
+        "properties": {
+          "path": { "$ref": "#/$defs/relativePath" },
+          "logical_path": { "$ref": "#/$defs/relativePath" },
+          "role": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "size": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "artifact_set_sha256": { "$ref": "#/$defs/sha256" },
+    "previous_approval": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "gate", "gate_id"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "gate": { "$ref": "#/$defs/gate" },
+            "gate_id": { "$ref": "#/$defs/gateId" }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gateId": { "type": "string", "pattern": "^SPECULA-GATE-[0-9A-F]{16}$" },
+    "gate": { "enum": ["analysis", "spec", "trace", "counterexample-mapping"] },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "boundFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "dirty_hash"],
+      "properties": {
+        "revision": { "type": ["string", "null"] },
+        "dirty_hash": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "revision", "branch", "dirty_hash", "dirty_entries", "git_dir_kind"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "revision": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
+        "dirty_hash": { "$ref": "#/$defs/sha256" },
+        "dirty_entries": { "type": "array", "items": { "type": "string" } },
+        "git_dir_kind": { "enum": ["directory", "file", "absent"] }
+      }
+    }
+  }
+}

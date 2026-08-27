@@ -161,6 +161,8 @@ class HandoffTests(unittest.TestCase):
             first.evidence["execution_identity"]["run_id"],
             second.evidence["execution_identity"]["run_id"],
         )
+        self.assertFalse(first.evidence["requires_human_gate_after_stage"])
+        self.assertIsNone(first.evidence["next_gate"])
 
     def test_linked_worktree_export_preserves_independent_git_history(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

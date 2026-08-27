@@ -127,6 +127,11 @@ def write_specula_inputs(root: Path) -> tuple[Path, Path]:
     guidance.write_text(
         "# Goal\n\nReview one socket commit protocol.\n", encoding="utf-8"
     )
+    fd_guidance = profile / "guidance/02-fd-object-lifecycle.md"
+    fd_guidance.write_text(
+        "# Goal\n\nModel one file-descriptor visibility protocol.\n",
+        encoding="utf-8",
+    )
     return profile, specula
 
 

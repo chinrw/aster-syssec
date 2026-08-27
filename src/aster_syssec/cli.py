@@ -53,8 +53,13 @@ from .safety import (
 from .scanner import RULE_IDS, StaticReviewer
 from .schemas import validate_instance
 from .selection import select_review_paths
-from .source import ensure_asterinas_checkout
+from .source import ensure_asterinas_checkout, inspect_source
 from .specula import prepare_handoff
+from .specula_gates import (
+    create_gate_request,
+    import_counterexample,
+    verify_gate_approval,
+)
 from .targets import load_target_registry, validate_targets_against_checkout
 
 
@@ -144,14 +149,23 @@ def build_parser() -> argparse.ArgumentParser:
     review.set_defaults(handler=_review)
 
     model = subparsers.add_parser(
-        "model", help="prepare a gated Specula dry-run or analysis handoff"
+        "model", help="prepare one gated Specula model-analysis phase"
     )
     _add_source_options(model)
     model.add_argument("--track", required=True, help="one security track id")
-    model.add_argument("--stage", choices=("dry-run", "analysis"), default="dry-run")
+    model.add_argument(
+        "--stage",
+        choices=("dry-run", "analysis", "specgen", "harness", "validate"),
+        default="dry-run",
+    )
     model.add_argument("--specula-profile", required=True, type=Path)
     model.add_argument("--specula-repo", required=True, type=Path)
     model.add_argument("--run-id")
+    model.add_argument(
+        "--gate-approval",
+        type=Path,
+        help="approved hash-bound gate required by downstream phases",
+    )
     model.add_argument(
         "--export-linked",
         action="store_true",
@@ -161,6 +175,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="print machine-readable handoff"
     )
     model.set_defaults(handler=_model)
+
+    model_gate = subparsers.add_parser(
+        "model-gate", help="freeze one Specula phase output for human approval"
+    )
+    _add_source_options(model_gate)
+    model_gate.add_argument("--handoff", required=True, type=Path)
+    model_gate.add_argument("--json", action="store_true")
+    model_gate.set_defaults(handler=_model_gate)
+
+    verify_model_gate = subparsers.add_parser(
+        "verify-model-gate", help="verify an approved Specula artifact gate"
+    )
+    verify_model_gate.add_argument("--approval", required=True, type=Path)
+    verify_model_gate.add_argument("--json", action="store_true")
+    verify_model_gate.set_defaults(handler=_verify_model_gate)
+
+    model_import = subparsers.add_parser(
+        "model-import", help="import an approved counterexample as a candidate"
+    )
+    _add_source_options(model_import)
+    model_import.add_argument("--track", required=True)
+    model_import.add_argument("--approval", required=True, type=Path)
+    model_import.add_argument("--json", action="store_true")
+    model_import.set_defaults(handler=_model_import)
 
     agent_review = subparsers.add_parser(
         "agent-review",
@@ -564,6 +602,7 @@ def _model(args: argparse.Namespace) -> int:
             "specula_repo": str(args.specula_repo.resolve()),
             "export_linked": args.export_linked,
             "requested_run_id": args.run_id,
+            "gate_approval": _optional_path(args.gate_approval),
         },
     )
     try:
@@ -577,6 +616,7 @@ def _model(args: argparse.Namespace) -> int:
             run_root=run.root,
             run_id=args.run_id,
             export_linked=args.export_linked,
+            gate_approval=args.gate_approval,
         )
         handoff = plan.evidence
         handoff_path = run.write_json(
@@ -585,6 +625,12 @@ def _model(args: argparse.Namespace) -> int:
             schema=plan.schema,
         )
         outputs = [handoff_path, *plan.artifacts]
+        for artifact in plan.artifacts:
+            if artifact.name == "gate-approval.json":
+                run.register_json_artifact(
+                    artifact,
+                    schema="specula-gate-approval.schema.json",
+                )
         command = plan.command_with_preflight(handoff_path)
         if command:
             command_path = run.write_text(
@@ -610,6 +656,127 @@ def _model(args: argparse.Namespace) -> int:
         f"model handoff: {'ready' if handoff['ready'] else 'blocked'}; run={run.root}",
     )
     return 0 if handoff["ready"] else 1
+
+
+def _model_gate(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    run = _start_run(
+        args,
+        registry,
+        "model-gate",
+        {"handoff": str(args.handoff.resolve())},
+    )
+    try:
+        ensure_asterinas_checkout(args.asterinas)
+        request, copied = create_gate_request(
+            handoff_path=args.handoff,
+            run_root=run.root,
+        )
+        run.register_json_artifact(
+            run.root / "specula-gate/inputs/handoff.json",
+            schema="specula-handoff.schema.json",
+        )
+        for artifact in request["artifacts"]:
+            if artifact["role"] == "counterexample-bundle":
+                run.register_json_artifact(
+                    run.root / "specula-gate" / artifact["path"],
+                    schema="specula-counterexample-source.schema.json",
+                )
+        observed = inspect_source(args.asterinas)
+        if request["source"] != {
+            "revision": observed.revision,
+            "dirty_hash": observed.dirty_hash,
+        }:
+            raise ValueError(
+                "Specula gate handoff targets a different Asterinas source"
+            )
+        request_path = run.write_json(
+            "specula-gate/request.json",
+            request,
+            schema="specula-gate-request.schema.json",
+        )
+        request_record = run.artifact_record("specula-gate/request.json")
+        run.complete([request_path, *copied])
+    except BaseException as error:
+        run.fail(error)
+        raise
+    summary = {
+        "run": str(run.root),
+        "gate": request["gate"],
+        "gate_id": request["gate_id"],
+        "request": str(request_path),
+        "request_sha256": request_record["sha256"],
+        "artifacts": len(request["artifacts"]),
+    }
+    _print_result(
+        args.json,
+        summary,
+        f"model gate: {request['gate']} {request['gate_id']}; request={request_path}",
+    )
+    return 0
+
+
+def _verify_model_gate(args: argparse.Namespace) -> int:
+    verified = verify_gate_approval(args.approval)
+    result = {
+        "verified": True,
+        "gate": verified["request"]["gate"],
+        "gate_id": verified["request"]["gate_id"],
+        "approval": verified["approval_path"],
+        "approval_sha256": verified["approval_sha256"],
+        "request": verified["request_path"],
+        "request_sha256": verified["request_sha256"],
+        "artifacts": len(verified["request"]["artifacts"]),
+    }
+    _print_result(
+        args.json,
+        result,
+        f"model gate: verified {result['gate']} {result['gate_id']}",
+    )
+    return 0
+
+
+def _model_import(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    require_tracks(registry, [args.track])
+    run = _start_run(
+        args,
+        registry,
+        "model-import",
+        {
+            "track": args.track,
+            "approval": str(args.approval.resolve()),
+        },
+    )
+    try:
+        ensure_asterinas_checkout(args.asterinas)
+        result = import_counterexample(
+            approval_path=args.approval,
+            source_root=args.asterinas,
+            expected_track=args.track,
+        )
+        result_path = run.write_json(
+            "specula/result.json",
+            result,
+            schema="specula-result.schema.json",
+        )
+        run.complete([result_path])
+    except BaseException as error:
+        run.fail(error)
+        raise
+    summary = {
+        "run": str(run.root),
+        "result": str(result_path),
+        "result_id": result["result_id"],
+        "engine": result["engine"],
+        "status": result["status"],
+    }
+    _print_result(
+        args.json,
+        summary,
+        f"model import: {result['result_id']} status={result['status']}; run={run.root}",
+    )
+    return 0
 
 
 def _agent_review(args: argparse.Namespace) -> int:

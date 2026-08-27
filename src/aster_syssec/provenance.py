@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from collections.abc import Iterable
 from pathlib import Path
@@ -42,6 +43,35 @@ def reviewer_identity() -> dict[str, Any]:
 
 def file_sha256(path: Path) -> str:
     return _file_hash(Path(path))
+
+
+def locked_nixpkgs_reference() -> str:
+    package_root = Path(__file__).resolve().parent
+    project_root = _project_root(package_root)
+    lock_path = (
+        project_root / "flake.lock"
+        if project_root is not None and (project_root / "flake.lock").is_file()
+        else _installed_data_file("flake.lock")
+    )
+    if lock_path is None:
+        raise ValueError("cannot locate the aster-syssec flake.lock")
+    try:
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        locked = lock["nodes"]["nixpkgs"]["locked"]
+    except (OSError, json.JSONDecodeError, KeyError, TypeError) as error:
+        raise ValueError(f"cannot resolve pinned nixpkgs from {lock_path}") from error
+    required = {
+        "type": locked.get("type"),
+        "owner": locked.get("owner"),
+        "repo": locked.get("repo"),
+        "rev": locked.get("rev"),
+    }
+    if required["type"] != "github" or not all(
+        isinstance(required[key], str) and required[key]
+        for key in ("owner", "repo", "rev")
+    ):
+        raise ValueError(f"unsupported pinned nixpkgs identity in {lock_path}")
+    return f"github:{required['owner']}/{required['repo']}/{required['rev']}"
 
 
 def _project_root(package_root: Path) -> Path | None:
