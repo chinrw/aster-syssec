@@ -1,0 +1,93 @@
+name: Runtime baseline
+
+on:
+  schedule:
+    - cron: "47 18 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SYSSEC_ASTERINAS_DEV_IMAGE: asterinas/dev@sha256:a32c639c66899de90875f4b1aa8614926ec172957bb27c59a93c94fdde4da934
+
+jobs:
+  partial-efault-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SYSSEC_JOB_ROOT: /tmp/aster-syssec-runtime
+      SYSSEC_WORK_ROOT: /tmp/aster-syssec-runtime/evidence
+      SYSSEC_UPLOAD_ROOT: /tmp/aster-syssec-runtime/upload
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out pinned Asterinas
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: chinrw/asterinas
+          ref: d0bddbf56d893221d103a0c3330f379dc59977b9
+          path: asterinas
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+
+      - name: Pull the pinned Asterinas build environment
+        run: docker pull "$SYSSEC_ASTERINAS_DEV_IMAGE"
+
+      - name: Resolve pinned Runtime inputs
+        id: runtime-inputs
+        run: |
+          mkdir -p "$SYSSEC_JOB_ROOT/inputs"
+          bundle=$(nix build .#linux-oracle-bundle --out-link "$SYSSEC_JOB_ROOT/inputs/linux-oracle" --print-out-paths)
+          packer=$(nix build .#linux-oracle-packer --out-link "$SYSSEC_JOB_ROOT/inputs/linux-oracle-packer" --print-out-paths)
+          cargo_osdk=$(nix build .#cargo-osdk --out-link "$SYSSEC_JOB_ROOT/inputs/cargo-osdk" --print-out-paths)
+          cargo_vendor=$(nix build .#asterinas-cargo-vendor --out-link "$SYSSEC_JOB_ROOT/inputs/asterinas-cargo-vendor" --print-out-paths)
+          {
+            echo "bundle=$bundle"
+            echo "packer=$packer"
+            echo "cargo_osdk=$cargo_osdk"
+            echo "cargo_vendor=$cargo_vendor"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run the Runtime baseline profile
+        env:
+          SYSSEC_CARGO_OSDK_HOST: ${{ steps.runtime-inputs.outputs.cargo_osdk }}/bin/cargo-osdk
+          SYSSEC_ASTERINAS_CARGO_VENDOR: ${{ steps.runtime-inputs.outputs.cargo_vendor }}
+        run: |
+          nix develop .#formal --command syssec runtime run \
+            --profile partial-efault-baseline \
+            --asterinas "$GITHUB_WORKSPACE/asterinas" \
+            --work-root "$SYSSEC_WORK_ROOT" \
+            --oracle-metadata "${{ steps.runtime-inputs.outputs.bundle }}/oracle-image.json" \
+            --initramfs-packer "${{ steps.runtime-inputs.outputs.packer }}/bin/syssec-initramfs-packer" \
+            --asterinas-make-executable "$GITHUB_WORKSPACE/scripts/ci-runtime-make.sh" \
+            --cargo-osdk-executable /root/.cargo/bin/cargo-osdk \
+            --asterinas-build-environment "$SYSSEC_ASTERINAS_DEV_IMAGE;cargo_osdk=${{ steps.runtime-inputs.outputs.cargo_osdk }};cargo_vendor=${{ steps.runtime-inputs.outputs.cargo_vendor }}" \
+            --json
+
+      - name: Pack Runtime evidence
+        if: always()
+        run: |
+          nix develop .#default --command syssec evidence pack \
+            --work-root "$SYSSEC_WORK_ROOT" \
+            --output "$SYSSEC_UPLOAD_ROOT" \
+            --max-bytes 52428800 \
+            --max-files 5000
+
+      - name: Upload Runtime evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: aster-syssec-runtime-evidence
+          path: ${{ env.SYSSEC_UPLOAD_ROOT }}
+          if-no-files-found: error
+          retention-days: 30

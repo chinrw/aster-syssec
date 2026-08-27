@@ -49,9 +49,11 @@ class AsterinasQemuAdapter:
         *,
         make_executable: str = "make",
         cargo_osdk_executable: str | None = None,
+        build_environment: str | None = None,
     ) -> None:
         self._make_executable = make_executable
         self._cargo_osdk_executable = cargo_osdk_executable or _installed_cargo_osdk()
+        self._build_environment = build_environment
 
     def execute(self, request: Mapping[str, Any]) -> dict[str, Any]:
         request_value = json.loads(json.dumps(request, ensure_ascii=False))
@@ -315,6 +317,7 @@ class AsterinasQemuAdapter:
             "tool": {
                 "make": self._make_executable,
                 "cargo_osdk": self._cargo_osdk_executable,
+                "build_environment": self._build_environment,
                 "qemu": None,
                 "binary_sha256": (
                     request["binary"]["sha256"] if outcome == "normal" else None

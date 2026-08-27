@@ -46,19 +46,28 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 
 | State | Revision | Scope |
 | --- | --- | --- |
-| merged `main` | `f2f431c` | PR #1-#9: Host Verification, Runtime Foundation, binary export, pinned Linux oracle, and the first real differential baseline |
+| merged `main` | `ce6758a` | PR #1-#12: Host Verification, Runtime Foundation, Linux differential baseline, safety boundaries, and the Runtime target pipeline |
 | signed tag `v0.3.0` | `421c9d9` | v0.3 Host Verification record |
 
-All nine aster-syssec PRs are merged. PR #9 head
+All twelve aster-syssec PRs are merged. PR #9 head
 `c47ac40e3ae27c4575a539bc6a3a2bbed41518c6` passed `validate` and
 `host-verification`; merge commit `f2f431c47430b308bfec406a54b745fdb89d712b`
-is the current public baseline.
+is the first real differential baseline. Later merged heads are:
 
-Main push run `32953069193` completed successfully on that merge commit. Both
-`validate` and the PR-profile `host-verification` job passed.
+| PR | Head | Scope |
+| --- | --- | --- |
+| #10 | `a796057` | refresh the Runtime handoff |
+| #11 | `fdeb807` | fail-closed core/model/lab target boundaries |
+| #12 | `5e64af9` | explicit four-stage Runtime target pipeline |
 
-Scheduled run `33004803564` executed the `nightly` profile on the same merge
-commit and passed. The nightly profile contains all 11 packaged Host targets.
+Merge commit `ce6758a0ef13b60b036634d7deeb7e424fb1f135` is the current public
+baseline.
+
+Main push run `32953069193` completed successfully on historical merge commit
+`f2f431c`. Both `validate` and the PR-profile `host-verification` job passed.
+
+Scheduled run `33004803564` executed the `nightly` profile on `f2f431c` and
+passed. The nightly profile contains all 11 packaged Host targets.
 The bounded evidence pack remains enabled; the earlier manual validation of
 that pack contained 87 files and 1,173,048 uncompressed bytes, compared with
 the pre-fix 1,136,398,829-byte artifact that included cache and build trees.
@@ -130,7 +139,7 @@ The main implementation areas are:
 | Host Verification | `targets.py`, `engines/*.py`, `data/targets/*/*.toml` |
 | Runtime Foundation | `runtime/protocol.py`, `runtime/asterinas.py`, `runtime/linux.py`, `runtime/binary.py`, runtime schemas |
 | external analysis handoffs | `agent_review.py`, `specula.py` |
-| CI and pinned environments | `flake.nix`, `flake.lock`, `.github/workflows/ci.yml` |
+| CI and pinned environments | `flake.nix`, `flake.lock`, `.github/workflows/ci.yml`, `runtime.yml`, `lab.yml` |
 
 ## Syscall analysis method
 
@@ -332,6 +341,14 @@ The explicit Runtime CLI provides target listing, checkout preflight, and the
 and comparison as separate hash-bound stages. Runtime is not part of ordinary
 PR or nightly profiles.
 
+The `runtime-ci-schedule` branch adds `.github/workflows/runtime.yml` with only
+manual and weekly triggers. Nix resolves the pinned oracle, packer,
+`cargo-osdk`, Asterinas workspace vendor, and pinned Rust build-std vendor
+before the Runtime stage. The build container then runs with `--network=none`,
+Cargo offline, `QEMU_HOSTFWD=off`, and no host device mounts. The workflow
+uploads only a verified 50 MiB/5,000-file evidence pack. Do not claim remote
+execution until the workflow is merged and dispatched on `main`.
+
 The Linux adapter seam is:
 
 ```python
@@ -386,6 +403,17 @@ The PR #9 tree passed the locked package gate with 132 tests, the packer shell
 contract, Ruff, formatting, Pyright, schema validation, Actionlint, and
 ShellCheck. PR #9, its main push run, and the next scheduled nightly run passed
 both remote CI jobs.
+
+The `runtime-ci-schedule` branch locally reproduced the full workflow contract
+against pinned Asterinas `d0bddbf...`. Pipeline
+`RUNTIME-PIPELINE-53FB20716090B443` passed export, Asterinas, Linux, and compare;
+both normal VM results bound binary SHA-256 `696ed3...7089`, and comparison
+`ORACLE-COMPARISON-8E777E1A1927BC98` matched all seven fields. Its verified
+evidence pack retained 32 files and 16,307,773 bytes. The Asterinas workspace
+vendor hash is `sha256-BCSyswj+Q1wm6M/XthjZfgjj43tAtmRvhCD4V0ygjCc=`; the
+pinned nightly build-std vendor hash is
+`sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=`. This is local executed
+evidence, not a remote workflow claim.
 
 One offline, network-disabled TCG smoke ran against Asterinas
 `da81ae952e245b6bb60229457f090575c4fe97f6`. It completed in 131.5 seconds and
@@ -497,10 +525,13 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Reproduce the runtime baseline in CI and retain a verified evidence pack.
-2. Extend low-risk ABI helpers and targets: message headers, control-message
+1. Merge the Runtime workflow, manually dispatch it on `main`, retain the
+   verified artifact, and record the run ID and aggregate evidence hash.
+2. Cut v0.4 after the remote Runtime baseline and current safety/Runtime CLI
+   state are documented on `main`.
+3. Extend low-risk ABI helpers and targets: message headers, control-message
    alignment/parser progress, timespec ranges, sigset size, and mmap arithmetic.
-3. Add phase-specific Specula execution, hash-bound gates, and candidate-only
+4. Add phase-specific Specula execution, hash-bound gates, and candidate-only
    result import in the model lane.
-4. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
+5. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
    only in the authorization-gated lab.

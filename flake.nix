@@ -230,6 +230,56 @@
             '';
           };
 
+          asterinasRustPlatform = pkgs.makeRustPlatform {
+            cargo = rustToolchain;
+            rustc = rustToolchain;
+          };
+
+          cargoOsdk = asterinasRustPlatform.buildRustPackage {
+            pname = "cargo-osdk";
+            version = "0.18.1";
+            src = asterinas-src;
+            patches = [ ./nix/cargo-osdk-runtime-source.patch ];
+            cargoRoot = "osdk";
+            buildAndTestSubdir = "osdk";
+            cargoLock.lockFile = "${asterinas-src}/osdk/Cargo.lock";
+            doCheck = false;
+            env.OSDK_LOCAL_DEV = "1";
+
+            meta = {
+              description = "Pinned Asterinas OSDK command-line tool";
+              homepage = "https://asterinas.github.io/book/osdk/guide/index.html";
+              license = lib.licenses.mpl20;
+              mainProgram = "cargo-osdk";
+              platforms = [ "x86_64-linux" ];
+            };
+          };
+
+          asterinasWorkspaceCargoVendor = pkgs.rustPlatform.fetchCargoVendor {
+            pname = "asterinas-workspace-cargo-vendor";
+            version = builtins.substring 0 12 asterinas-src.rev;
+            src = asterinas-src;
+            hash = "sha256-BCSyswj+Q1wm6M/XthjZfgjj43tAtmRvhCD4V0ygjCc=";
+          };
+
+          asterinasRustStdCargoVendor = pkgs.rustPlatform.fetchCargoVendor {
+            pname = "asterinas-rust-std-cargo-vendor";
+            version = rustSpec.channel;
+            src = "${rustToolchain}/lib/rustlib/src/rust/library";
+            hash = "sha256-q/scbT50qB0Qhoqsoa6/QJOHIuN7GTS9B1bdHRJXfZ8=";
+          };
+
+          asterinasCargoVendor = pkgs.runCommand
+            "asterinas-cargo-vendor-${builtins.substring 0 12 asterinas-src.rev}-vendor"
+            { }
+            ''
+              mkdir -p "$out"
+              cp -R ${asterinasWorkspaceCargoVendor}/. "$out/"
+              chmod -R u+w "$out"
+              cp -R ${asterinasRustStdCargoVendor}/source-registry-0/. "$out/source-registry-0/"
+              chmod -R a-w "$out"
+            '';
+
           kaniInstaller = pkgs.rustPlatform.buildRustPackage {
             pname = "kani-verifier";
             version = versions.kani;
@@ -338,6 +388,8 @@
         in
         rec {
           inherit
+            asterinasCargoVendor
+            cargoOsdk
             kaniInstaller
             kaniSetup
             pkgs
@@ -355,6 +407,8 @@
             aster-syssec-lab = syssecLab;
             kani-installer = kaniInstaller;
             kani-setup = kaniSetup;
+            cargo-osdk = cargoOsdk;
+            asterinas-cargo-vendor = asterinasCargoVendor;
             linux-oracle-bundle = linuxOracle.bundle;
             linux-oracle-packer = linuxOracle.packer;
             inherit syzkaller;

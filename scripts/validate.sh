@@ -8,7 +8,11 @@ project_root=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 cd "$project_root"
 PYTHONPATH=src python3 -m unittest discover -v
 PYTHONPATH=src python3 -m compileall -q src tests
-sh -n scripts/ci-integration.sh scripts/ci-pr.sh scripts/validate.sh
+sh -n \
+    scripts/ci-integration.sh \
+    scripts/ci-pr.sh \
+    scripts/ci-runtime-make.sh \
+    scripts/validate.sh
 if command -v ruff >/dev/null 2>&1; then
     ruff check src tests
     ruff format --check src tests
