@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -7,9 +8,14 @@ from pathlib import Path
 class CiWorkflowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.workflow = (
-            Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml"
-        ).read_text(encoding="utf-8")
+        root = Path(__file__).resolve().parents[1]
+        cls.workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        cls.asterinas_revision = json.loads(
+            (root / "flake.lock").read_text(encoding="utf-8")
+        )["nodes"]["asterinas-src"]["locked"]["rev"]
+
+    def test_host_job_checks_out_the_locked_asterinas_revision(self) -> None:
+        self.assertIn(f"ref: {self.asterinas_revision}", self.workflow)
 
     def test_manual_profile_choice_and_concurrency_are_explicit(self) -> None:
         self.assertIn("workflow_dispatch:", self.workflow)

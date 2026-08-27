@@ -14,6 +14,35 @@ Lab boundary and packer shell contracts, Ruff, formatting, Pyright, JSON Schema
 validation, Actionlint, and ShellCheck. `nix run . -- --version` and
 `nix run .#syssec-lab -- --version` both reported `0.4.0`.
 
+## Post-v0.4 control-message Host extension
+
+Asterinas commit `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb` moves the
+Linux `cmsghdr` type and its checked payload, alignment, and parser-step
+calculations into the production `aster-uapi` seam. The flake pins that commit
+with NAR hash `sha256-rgphrPDofHaCxe/Vk87wGuUovh4vvM3t0FcQdoSy+0E=`.
+
+The Host registry now contains 16 core targets: eight Kani proofs, two Miri
+tests, three bare-metal layout targets, two bounded fuzz targets, and one Loom
+model. Checkout preflight reported 16 targets and zero issues. The clean
+Asterinas commit passed both local profiles:
+
+- `pr`: three reviewer commands and all 12 blocking targets passed; result
+  SHA-256 `f7bc7a7741a5d731f5dfa688d913e86fe338d3675cf6d18cab3976cefd11fc9c`;
+- `nightly`: two reviewer commands and all 16 targets passed; result SHA-256
+  `a7df096ed33410bb08168c7d31e1f4706b39c59163cceb359bb5a0543dcbfe10`.
+
+The three new Kani proofs cover checked alignment, bounded parser progress,
+and payload-length round trips. Miri validates the x86-64 header layout. The
+new `cmsg-host-fuzz` target completed 1000/1000 runs after its lockfile inputs
+were primed, with execution remaining offline. The verified nightly evidence
+pack retained 117 files and 1,269,575 bytes with content SHA-256
+`67218b44276ea01f4d6563cc3f6e9a4ac248d8b9a8030db46bee45d52d365403`.
+
+Both fixed-output vendor derivations rebuilt at their existing hashes. The
+Runtime workflow now selects the same Asterinas commit, but the last completed
+real dual-VM baseline below remains the v0.4.0 run until a new Runtime job is
+recorded.
+
 ## Current runtime baseline
 
 The 2026-08-26 baseline pins Asterinas

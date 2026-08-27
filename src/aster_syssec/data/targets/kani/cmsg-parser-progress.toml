@@ -1,0 +1,24 @@
+version = 1
+id = "cmsg-parser-progress"
+engine = "kani"
+track = "socket-cmsg-iovec"
+properties = ["BOUNDARY-VALIDATION", "PARTIAL-PROGRESS-CONSISTENCY"]
+package = "aster-uapi"
+harness = "proof_control_message_parser_step_makes_progress"
+source_symbols = ["ControlMessageHeader", "ControlMessageReadStep"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+unwind = 8
+
+[policy]
+expected = "pass"
+pr_blocking = true

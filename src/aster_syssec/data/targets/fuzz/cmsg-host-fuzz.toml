@@ -1,0 +1,27 @@
+version = 1
+id = "cmsg-host-fuzz"
+engine = "fuzz"
+track = "socket-cmsg-iovec"
+properties = ["BOUNDARY-VALIDATION", "PARTIAL-PROGRESS-CONSISTENCY"]
+package = "aster-uapi-fuzz"
+manifest_path = "kernel/libs/aster-uapi/fuzz/Cargo.toml"
+fuzz_target = "fuzz_cmsg"
+runs = 1000
+max_input_size = 16
+sanitizer = "none"
+source_symbols = ["ControlMessageHeader", "ControlMessageLayout", "read_step"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+
+[policy]
+expected = "pass"
+pr_blocking = true

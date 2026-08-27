@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -19,6 +20,9 @@ class RuntimeWorkflowTests(unittest.TestCase):
         cls.cargo_osdk_patch = (
             PROJECT_ROOT / "nix/cargo-osdk-runtime-source.patch"
         ).read_text(encoding="utf-8")
+        cls.asterinas_revision = json.loads(
+            (PROJECT_ROOT / "flake.lock").read_text(encoding="utf-8")
+        )["nodes"]["asterinas-src"]["locked"]["rev"]
 
     def test_runtime_runs_only_manually_and_weekly(self) -> None:
         triggers = self.workflow.split("permissions:", 1)[0]
@@ -32,7 +36,7 @@ class RuntimeWorkflowTests(unittest.TestCase):
 
     def test_runtime_inputs_are_immutable_and_networkless(self) -> None:
         self.assertIn(
-            "ref: d0bddbf56d893221d103a0c3330f379dc59977b9",
+            f"ref: {self.asterinas_revision}",
             self.workflow,
         )
         self.assertIn(
