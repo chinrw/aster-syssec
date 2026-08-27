@@ -55,6 +55,12 @@ class RuntimeWorkflowTests(unittest.TestCase):
         )
         self.assertIn("asterinasRustStdCargoVendor", self.flake)
         self.assertIn(
+            "rustSpec = (builtins.fromTOML (builtins.readFile "
+            '"${asterinas-src}/rust-toolchain.toml")).toolchain;',
+            self.flake,
+        )
+        self.assertIn("version = rustSpec.channel;", self.flake)
+        self.assertIn(
             'src = "${rustToolchain}/lib/rustlib/src/rust/library";', self.flake
         )
         self.assertIn(

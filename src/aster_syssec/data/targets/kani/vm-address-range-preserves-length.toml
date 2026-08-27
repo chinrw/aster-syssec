@@ -1,0 +1,24 @@
+version = 1
+id = "vm-address-range-preserves-length"
+engine = "kani"
+track = "vm-page-cache"
+properties = ["BOUNDARY-VALIDATION", "FAILURE-ATOMICITY", "LINUX-ABI-CONTRACT"]
+package = "aster-uapi"
+harness = "proof_checked_address_range_preserves_length"
+source_symbols = ["CheckedAddressRange"]
+
+[safety]
+class = "core"
+agent_mode = "allowed"
+network = false
+may_generate_reproducer = false
+requires_authorization = false
+
+[limits]
+timeout_seconds = 300
+memory_bytes = 8589934592
+unwind = 8
+
+[policy]
+expected = "pass"
+pr_blocking = true

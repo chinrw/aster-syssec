@@ -39,6 +39,9 @@ class PackagedProfileTests(unittest.TestCase):
                 "timespec-nonnegative-seconds",
                 "timespec-normalized-nanoseconds",
                 "sigset-exact-size",
+                "vm-page-alignment-no-wrap",
+                "vm-address-range-preserves-length",
+                "vm-address-range-overlap-half-open",
                 "user-iovec-layout",
                 "control-message-header-layout",
                 "user-message-header-layout",
@@ -315,7 +318,7 @@ class TargetCliTests(unittest.TestCase):
     ) -> None:
         targets = load_target_registry(load_registry())
 
-        self.assertEqual(len(targets.targets), 24)
+        self.assertEqual(len(targets.targets), 27)
         self.assertEqual(
             {target.engine for target in targets.targets.values()},
             {"fuzz", "kani", "layout", "loom", "miri"},
