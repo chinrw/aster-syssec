@@ -58,6 +58,10 @@ class RuntimeWorkflowTests(unittest.TestCase):
             self.flake,
         )
         self.assertIn("asterinasWorkspaceCargoVendor", self.flake)
+        self.assertIn("nix develop .#formal --command true", self.workflow)
+        self.assertIn("nix develop .#default --command true", self.workflow)
+        self.assertIn("nix develop --offline .#formal", self.workflow)
+        self.assertIn("nix develop --offline .#default", self.workflow)
         self.assertIn("CARGO_NET_OFFLINE", self.make_wrapper)
         self.assertIn("QEMU_HOSTFWD", self.make_wrapper)
         self.assertNotIn("--privileged", self.make_wrapper)
