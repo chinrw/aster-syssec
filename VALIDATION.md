@@ -1,11 +1,13 @@
 # Validation
 
-## v0.4.0 release candidate
+## v0.4.0 release
 
-The release branch synchronizes the main package, Lab package, Lab dependency,
-flake packages, and runtime `__version__` at `0.4.0`. The tag remains absent
-until the release PR and required checks pass. `docs/v0.4-release.md` records
-the release scope and explicit deferred work.
+The release synchronizes the main package, Lab package, Lab dependency, flake
+packages, and runtime `__version__` at `0.4.0`.
+`docs/v0.4-release.md` records the release scope and explicit deferred work.
+Signed annotated tag `v0.4.0` has tag object
+`a14a73475e56192b499c7470a234bf4c2cc415ae` and peels to release merge commit
+`30b5a4dda39d5d58042ff42865e9b57d157bcd2d`.
 
 The locked flake gate passed with 160 tests, both `0.4.0` package builds, the
 Lab boundary and packer shell contracts, Ruff, formatting, Pyright, JSON Schema
