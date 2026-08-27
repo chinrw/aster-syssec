@@ -467,6 +467,7 @@ unexpected exception leaves the manifest marked `failed`.
 
 ## Contracts
 
+- [v0.4.0 release record](docs/v0.4-release.md)
 - [Current agent handoff](docs/agent-handoff.md)
 - [Reviewer contract](docs/reviewer-contract.md)
 - [Threat model](docs/threat-model.md)

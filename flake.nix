@@ -140,7 +140,7 @@
 
           syssec = python.pkgs.buildPythonApplication {
             pname = "aster-syssec";
-            version = "0.3.0";
+            version = "0.4.0";
             pyproject = true;
             src = projectSource;
 
@@ -199,7 +199,7 @@
 
           syssecLab = python.pkgs.buildPythonApplication {
             pname = "aster-syssec-lab";
-            version = "0.3.0";
+            version = "0.4.0";
             pyproject = true;
             src = ./packages/aster-syssec-lab;
 
