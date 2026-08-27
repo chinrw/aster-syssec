@@ -36,7 +36,7 @@ Current `main` implements:
 - verified evidence packing with explicit byte and file budgets;
 - manually selectable PR and nightly CI profiles with per-target summaries.
 
-The bundled vertical slice contains ten Kani proofs, three Miri tests, three
+The bundled vertical slice contains twelve Kani proofs, four Miri tests, three
 bare-metal layout targets, two cargo-fuzz targets, and one Loom model. These
 targets require their matching production helper packages in the Asterinas
 checkout; `targets check` fails before execution when the package, symbol,
@@ -66,7 +66,7 @@ validates authorization documents and reports the Lab boundary; it cannot
 execute a Lab case.
 
 The default flake input reads the Rust channel, components, and targets from
-Asterinas revision `974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8`. Override it
+Asterinas revision `820ec6464809071779f3c386634befcc83da10bc`. Override it
 when reviewing another checkout:
 
 ```sh

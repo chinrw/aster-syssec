@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: chinrw/asterinas
-          ref: 974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8
+          ref: 820ec6464809071779f3c386634befcc83da10bc
           path: asterinas
           persist-credentials: false
 
