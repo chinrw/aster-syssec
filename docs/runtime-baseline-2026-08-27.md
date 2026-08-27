@@ -7,10 +7,10 @@ rewriting the historical 2026-08-26 baseline.
 
 | Input | Identity |
 | --- | --- |
-| aster-syssec | `70b3103dba44f00e74fb3bdf5baf153d03e56055` |
-| Asterinas content | `820ec6464809071779f3c386634befcc83da10bc` |
-| Asterinas merge | `2b8472c7673a86fa47c7fa92796228ba739d343e` |
-| Asterinas NAR | `sha256-UAenN/jXYpPthwCRWN6ePbbUIKMv7V59ZCOPwk0+BqY=` |
+| aster-syssec | `58b07bf1dd724636e0af35c226bc2f2c94d4bf2a` |
+| Asterinas content | `0bc8839d496f185dd7662c79d53e98619bf1169c` |
+| Asterinas merge | `a20a44592fbd6e6efdf92af486873cb6f4c83bc5` |
+| Asterinas NAR | `sha256-4DljZtGrzNVVSprBN3yC5mqFe/+2N5VE18m2WAKCyQ4=` |
 | Linux | `bf3be28f6721e24961992ebb9e61c0cf21a56806` (6.18.45) |
 | QEMU | 11.1.0, SHA-256 `28c1c21be818b265f0e169bdf2de5c83a0827ab9e69059098f2dc753bd6548ea` |
 | build container | `asterinas/dev@sha256:a32c639c66899de90875f4b1aa8614926ec172957bb27c59a93c94fdde4da934` |
@@ -25,23 +25,23 @@ Git inputs may be fetched only while materializing these fixed-output inputs.
 
 ## Workflow result
 
-[Workflow run 33075155261](https://github.com/chinrw/aster-syssec/actions/runs/33075155261)
-completed successfully on `main`. The job ran from 13:17:07Z to 13:30:44Z.
-Pipeline `RUNTIME-PIPELINE-6CDABEF04FBB6E5C` passed all four stages:
+[Workflow run 33088278826](https://github.com/chinrw/aster-syssec/actions/runs/33088278826)
+completed successfully on `main`. The job ran from 15:31:33Z to 15:45:25Z.
+Pipeline `RUNTIME-PIPELINE-F08C97F40D002CAB` passed all four stages:
 
 | Stage | Artifact SHA-256 |
 | --- | --- |
-| export-binary | `12330d6c2b5b1cf88d4066137abe30ea6e0c3f6cb452d2e771ec8f8f43c08345` |
-| run-asterinas | `4a1cc4b3c962c5ee701ffa7f01702b7e86bf0cfc774188f98d39ec97fd9b12f7` |
-| run-linux | `1edc28ef763c72a539b07ce8f37d29eefd5452edea1ffb06068c3c337f3a391d` |
-| compare | `7618615446f3777e588dc492d2e8cc7161ec3557d00c8e13bb43bfdd37ba15f0` |
+| export-binary | `a9b0c5d637112840e3562d11cf1e54f6d2d065013572f16873b9155f8dfd8f9b` |
+| run-asterinas | `1b6d50660e1101f8e5acb81e818babb433208de172af2c2294a24360cd94d5b9` |
+| run-linux | `c0e0520cbacf82df1ed4341e6a48a51fe377876ede84f63fb98d68a5c8a1af7d` |
+| compare | `ce98bfe8c524a79e5d4671e530ba8e6e0fa4536a33f47491f097beef02f84be1` |
 
 The pipeline-result SHA-256 is
-`e6557842c437c7b9f9b726cb80496f9984f335aa1b227aadbda9947b25cb8202`.
+`39d8665e9669ffb4c7c8774bb4ac9382f28ecd52a4227e1a6b7e2f4b4701c96d`.
 
 ## Exact binary provenance
 
-`BINARY-PROVENANCE-50EE3829075242F1` exported the same static case binary used
+`BINARY-PROVENANCE-B2D66912DCA5048D` exported the same static case binary used
 by the v0.4 baseline:
 
 ```text
@@ -56,14 +56,14 @@ verified the same binary hash before reporting a normal result.
 
 ## Guest results and comparison
 
-Asterinas produced `RUNTIME-RESULT-92EDFED56F112ACB`. Linux produced
-`RUNTIME-RESULT-ACA55E494EE1926A`. Both returned:
+Asterinas produced `RUNTIME-RESULT-A5D56872C1EF1982`. Linux produced
+`RUNTIME-RESULT-1AEFC260A34572F0`. Both returned:
 
 ```json
 {"case_id":"pipe-partial-efault-read","exit_kind":"normal","return":-1,"errno":14,"first_byte":65,"remaining_return":2,"remaining_errno":0,"remaining_byte_0":65,"remaining_byte_1":66}
 ```
 
-Comparison `ORACLE-COMPARISON-F4A8F607F68060FB` matched all seven declared
+Comparison `ORACLE-COMPARISON-EBE6A95D8F953B78` matched all seven declared
 fields and recorded `status=match`, `disposition=baseline`, with no diagnostics.
 This is a positive contract baseline, not a finding.
 
@@ -75,12 +75,14 @@ forwarding disabled, and networkless Asterinas/Linux QEMU. Evidence packing
 also used `nix develop --offline`. The Runtime and pack steps contained zero
 download, Nix-store copy, or Git-input unpack records.
 
-Artifact `9648362201` has archive digest
-`sha256:906920223ef222dcb611a28431ea2bb11835a0b22a7d1059d7b1ab45ed2e95e9`
-and compressed size 15,160,447 bytes.
+Artifact `9653695572` has archive digest
+`sha256:c9f90d9152d0af60fb78442ce1d375954f4f46f7709909e7180ba0d70bb47956`
+and compressed size 15,160,800 bytes.
 The downloaded pack contained 31 manifest-listed files plus its index, for 32
-files and 16,524,703 bytes. Every listed file SHA-256 and size matched. The
+files and 16,524,597 bytes. Every listed file SHA-256 and size matched. The
 independently recomputed content SHA-256 matched
-`b2d2504dc68e1912351370dcfc8a626892cd6efa266e007e28dab08979c8ab65`.
-The nine primary Runtime artifacts and the run manifest also passed their
-pinned JSON Schema and manifest-integrity checks after download.
+`b6420d3a4757349de0bcde9e75e06c3c3f9ac02c7879ccb93b3e78272f2d8890`.
+The twelve primary Runtime artifacts, evidence-pack index, and run manifest
+also passed their pinned JSON Schema and manifest-integrity checks after
+download. The Runtime and pack steps contained 99 log lines and zero download,
+fetch, or Nix-store copy records.
