@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asterinas.dev/syssec/specula-handoff.schema.json",
-  "title": "Gated Specula handoff",
+  "title": "Phase-specific Specula handoff",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,30 +10,107 @@
     "ready",
     "blockers",
     "stage",
+    "phase",
+    "safety_class",
     "track",
     "specula_readiness",
     "requires_human_gate_after_stage",
     "source",
     "artifact",
+    "artifact_initial",
     "source_export",
+    "workspace",
+    "phase_inputs",
+    "gate_approval",
     "execution_identity",
+    "phase_command",
     "direct_command",
     "nix_command",
     "preflight",
     "next_gate"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "kind": { "const": "specula" },
     "ready": { "type": "boolean" },
     "blockers": { "type": "array", "items": { "type": "string" } },
-    "stage": { "enum": ["dry-run", "analysis"] },
-    "track": { "type": "string" },
-    "specula_readiness": { "type": "string" },
-    "requires_human_gate_after_stage": { "const": true },
+    "stage": { "enum": ["dry-run", "analysis", "specgen", "harness", "validate"] },
+    "phase": { "enum": ["analyze", "specgen", "harness", "validate"] },
+    "safety_class": { "const": "model" },
+    "track": { "type": "string", "minLength": 1 },
+    "specula_readiness": { "type": "string", "minLength": 1 },
+    "requires_human_gate_after_stage": { "type": "boolean" },
     "source": { "$ref": "#/$defs/source" },
-    "artifact": { "type": "string" },
-    "source_export": { "type": ["object", "null"] },
+    "artifact": { "type": "string", "minLength": 1 },
+    "artifact_initial": { "$ref": "#/$defs/source" },
+    "source_export": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+        "kind",
+        "revision",
+        "bundle",
+        "bundle_sha256",
+        "history_available",
+        "history_scope",
+        "independent_git_dir",
+        "uses_object_alternates",
+        "excluded_dirty_entries"
+          ],
+          "properties": {
+        "kind": { "const": "git-bundle-clone" },
+        "revision": { "type": "string", "minLength": 1 },
+        "bundle": { "type": "string", "minLength": 1 },
+        "bundle_sha256": { "$ref": "#/$defs/sha256" },
+        "history_available": { "const": true },
+        "history_scope": { "const": "ancestors-of-exact-head" },
+        "independent_git_dir": { "const": true },
+        "uses_object_alternates": { "const": false },
+        "excluded_dirty_entries": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+          }
+        }
+      ]
+    },
+    "workspace": { "type": "string", "minLength": 1 },
+    "phase_inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "logical_path", "role", "sha256", "size"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "logical_path": { "$ref": "#/$defs/relativePath" },
+          "role": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "size": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "gate_approval": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "gate", "gate_id", "request_path", "request_sha256"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "gate": { "enum": ["analysis", "spec", "trace", "counterexample-mapping"] },
+            "gate_id": { "$ref": "#/$defs/gateId" },
+            "request_path": { "type": "string", "minLength": 1 },
+            "request_sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      ]
+    },
     "execution_identity": {
       "type": "object",
       "additionalProperties": false,
@@ -45,35 +122,129 @@
         "guidance",
         "guidance_sha256",
         "target",
+        "phase_target",
         "run_id"
       ],
       "properties": {
         "source_revision": { "type": ["string", "null"] },
         "source_dirty_hash": { "$ref": "#/$defs/sha256" },
-        "agent_config": { "type": "string" },
+        "agent_config": { "type": "string", "minLength": 1 },
         "agent_config_sha256": { "$ref": "#/$defs/sha256" },
-        "guidance": { "type": "string" },
+        "guidance": { "type": "string", "minLength": 1 },
         "guidance_sha256": { "$ref": "#/$defs/sha256" },
-        "target": { "type": "string" },
-        "run_id": { "type": "string" }
+        "target": { "type": "string", "minLength": 1 },
+        "phase_target": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "string", "minLength": 1 }
       }
+    },
+    "phase_command": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["argv", "nix_argv", "cwd", "nixpkgs_reference", "agent_selection"],
+          "properties": {
+            "argv": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "nix_argv": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "cwd": { "type": "string", "minLength": 1 },
+            "nixpkgs_reference": {
+              "type": "string",
+              "pattern": "^github:[^/]+/[^/]+/[0-9a-f]{40}$"
+            },
+            "agent_selection": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["profile", "agent", "model", "effort"],
+              "properties": {
+                "profile": { "type": "string", "minLength": 1 },
+                "agent": { "type": "string", "minLength": 1 },
+                "model": { "type": "string", "minLength": 1 },
+                "effort": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      ]
     },
     "direct_command": { "type": ["string", "null"] },
     "nix_command": { "type": ["string", "null"] },
     "preflight": { "$ref": "#/$defs/preflight" },
-    "next_gate": { "type": "string" }
+    "next_gate": {
+      "type": ["string", "null"],
+      "enum": ["analysis", "spec", "trace", "counterexample-mapping", null]
+    }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "stage": { "const": "dry-run" } } },
+      "then": {
+        "properties": {
+          "phase": { "const": "analyze" },
+          "requires_human_gate_after_stage": { "const": false },
+          "gate_approval": { "type": "null" },
+          "next_gate": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "stage": { "const": "analysis" } } },
+      "then": {
+        "properties": {
+          "phase": { "const": "analyze" },
+          "requires_human_gate_after_stage": { "const": true },
+          "gate_approval": { "type": "null" },
+          "next_gate": { "const": "analysis" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "stage": { "const": "specgen" } } },
+      "then": {
+        "properties": {
+          "phase": { "const": "specgen" },
+          "requires_human_gate_after_stage": { "const": true },
+          "next_gate": { "const": "spec" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "stage": { "const": "harness" } } },
+      "then": {
+        "properties": {
+          "phase": { "const": "harness" },
+          "requires_human_gate_after_stage": { "const": true },
+          "next_gate": { "const": "trace" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "stage": { "const": "validate" } } },
+      "then": {
+        "properties": {
+          "phase": { "const": "validate" },
+          "requires_human_gate_after_stage": { "const": true },
+          "next_gate": { "const": "counterexample-mapping" }
+        }
+      }
+    }
+  ],
   "$defs": {
-    "sha256": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gateId": { "type": "string", "pattern": "^SPECULA-GATE-[0-9A-F]{16}$" },
+    "relativePath": {
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
     },
     "source": {
       "type": "object",
-      "required": ["path", "revision", "dirty_hash", "dirty_entries", "git_dir_kind"],
+      "additionalProperties": false,
+      "required": ["path", "revision", "branch", "dirty_hash", "dirty_entries", "git_dir_kind"],
       "properties": {
-        "path": { "type": "string" },
+        "path": { "type": "string", "minLength": 1 },
         "revision": { "type": ["string", "null"] },
+        "branch": { "type": ["string", "null"] },
         "dirty_hash": { "$ref": "#/$defs/sha256" },
         "dirty_entries": { "type": "array", "items": { "type": "string" } },
         "git_dir_kind": { "enum": ["directory", "file", "absent"] }

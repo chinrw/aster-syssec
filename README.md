@@ -43,9 +43,9 @@ checkout; `targets check` fails before execution when the package, symbol,
 harness, test, or fuzz target is absent.
 
 The current CLI does not execute Lab cases, run kernel sequence fuzzing,
-enforce Specula phase gates, or promote findings. Engine and runtime results
-remain evidence inputs and cannot become confirmed findings through the current
-CLI.
+confirm Specula candidates, or promote findings. Engine, runtime, and model
+results remain evidence inputs and cannot become confirmed findings through the
+current CLI.
 
 ## Install
 
@@ -420,9 +420,10 @@ launcher, profile, or target inputs.
 
 ## Specula handoff
 
-`model` permits only dry-run and analysis in this version. It never starts
-Specula. It hashes the agent config and guidance, fixes a unique run ID, and
-emits the exact command.
+`model` prepares one direct Specula phase and never starts it implicitly. The
+main package exposes only `analyze`, `specgen`, `harness`, and `validate` in the
+`model` safety class. It does not expose Specula confirmation, classification,
+repair, a runtime reproducer, or finding promotion.
 
 ```sh
 syssec model \
@@ -431,23 +432,105 @@ syssec model \
   --specula-profile /path/to/specula-profile \
   --specula-repo /path/to/specula \
   --track fd-object-lifetime \
-  --stage dry-run \
+  --stage analysis \
   --export-linked
 ```
 
-`--export-linked` is required when `.git` is a linked-worktree file. It creates
-an independent checkout from a Git bundle containing exact HEAD and its
-ancestors. The export has its own `.git` directory, no object alternates, a
-clean detached HEAD, and enough history for local archaeology. It refuses the
-export when tracked working-tree changes would be omitted. Untracked files are
-recorded as excluded inputs.
+The resulting `specula/command.sh` runs `specula analyze` from an isolated
+workspace. `--stage dry-run` uses the same direct command with `--dry-run` and
+does not produce a gate. Every executable phase uses an independent exact-HEAD
+checkout from a Git bundle. The checkout has its own `.git` directory, no
+object alternates, and enough history for local archaeology. Tracked source
+changes fail closed; untracked files are recorded as excluded inputs. The JDK
+and Maven shell references the exact nixpkgs revision in this repository's
+`flake.lock`, not the ambient flake registry.
 
-After analysis, inspect `modeling-brief.md`, `analysis-report.md`, and
-`review-analysis.md`. Spec generation remains blocked until a human accepts one
-shared state machine and one Linux-visible contract.
+A partial clone must have every object needed for the exact-HEAD bundle. The
+adapter reports Git's missing-object failure and does not silently replace the
+self-contained export with a remote or shallow checkout.
+
+After the phase finishes, freeze its required outputs into a gate request:
+
+```sh
+syssec model-gate \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --handoff /path/to/specula/handoff.json
+```
+
+The command copies the phase artifacts into registered evidence and binds their
+paths, roles, sizes, hashes, aggregate hash, source revision, post-phase artifact
+checkout, handoff, and predecessor approval. A human reviews that immutable
+request and writes a separate document conforming to
+`specula-gate-approval.schema.json`. Changing any request, artifact, or earlier
+approval invalidates the chain.
+
+```json
+{
+  "schema_version": 1,
+  "kind": "specula-gate-approval",
+  "gate_id": "SPECULA-GATE-0123456789ABCDEF",
+  "gate": "analysis",
+  "request_path": "/absolute/path/to/specula-gate/request.json",
+  "request_sha256": "<64 lowercase hex characters>",
+  "decision": "approved",
+  "approved_by": "reviewer identity",
+  "approved_at": "2026-08-28T12:00:00+00:00",
+  "notes": "accepted state machine and Linux-visible contract"
+}
+```
+
+`gate_id`, `gate`, and `request_sha256` must be copied from the frozen request;
+the reviewer supplies the decision, identity, time, and notes. The CLI verifies
+but never creates an approved decision.
+
+| Prepared stage | Required approval | Next gate |
+| --- | --- | --- |
+| `analysis` | none | `analysis` |
+| `specgen` | approved `analysis` gate | `spec` |
+| `harness` | approved `spec` gate | `trace` |
+| `validate` | approved `trace` gate | `counterexample-mapping` |
+
+Pass the reviewed approval to the next phase:
+
+```sh
+syssec model \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --specula-profile /path/to/specula-profile \
+  --specula-repo /path/to/specula \
+  --track fd-object-lifetime \
+  --stage specgen \
+  --gate-approval /path/to/analysis-approval.json \
+  --export-linked
+```
+
+`verify-model-gate --approval ...` verifies the full predecessor chain without
+running Specula. Each downstream handoff copies only the approved artifacts
+needed by the next phase into a new workspace and verifies those copies before
+execution. It also registers an exact copy of the human-authored approval so
+the evidence pack retains the decision document.
+
+The final mapping gate accepts one restricted `counterexample-bundle.json` with
+only model bounds, the TLC result, counterexample states, source anchors, and
+trace mapping. Import remains candidate-only:
+
+```sh
+syssec model-import \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --track fd-object-lifetime \
+  --approval /path/to/counterexample-mapping-approval.json
+```
+
+The normalized result always has `engine = specula`, `status = candidate`, and
+`safety_class = model`. Its schema rejects reproducer, exploitability, finding,
+and promotion fields.
 
 The files under the supplied `--specula-profile` path are read in place. The
-prepared agent config and guidance are not edited or copied back.
+prepared agent config and guidance are not edited or copied back. The mutable
+phase checkout and workspace stay outside the registered output list; the Git
+bundle, handoff, command, gate request, and frozen gate artifacts are evidence.
 
 Both handoff scripts verify the reviewer, checkout revisions and dirty hashes,
 and hashed input files before execution. `verify-handoff` is read-only and does
@@ -478,6 +561,10 @@ unexpected exception leaves the manifest marked `failed`.
 - [Finding schema](schemas/finding.schema.json)
 - [Run manifest schema](schemas/run-manifest.schema.json)
 - [Specula handoff schema](schemas/specula-handoff.schema.json)
+- [Specula gate request schema](schemas/specula-gate-request.schema.json)
+- [Specula gate approval schema](schemas/specula-gate-approval.schema.json)
+- [Specula counterexample source schema](schemas/specula-counterexample-source.schema.json)
+- [Specula candidate result schema](schemas/specula-result.schema.json)
 - [Asterinas review handoff schema](schemas/agent-review-handoff.schema.json)
 - [Trace event schema](schemas/trace-event.schema.json)
 - [Linux execution provenance schema](schemas/linux-execution.schema.json)

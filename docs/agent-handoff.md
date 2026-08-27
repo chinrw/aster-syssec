@@ -222,7 +222,8 @@ Asterinas source (read-only, exact revision)
   |                                           --> normalized result
   |                                           --> verified evidence pack
   |
-  +-- agent/specula preparation --> hash-bound handoff script
+  +-- Specula phase preparation --> hash-bound handoff --> human gate
+                                                     --> candidate-only import
   |
   +-- runtime request --> strict guest protocol --> Asterinas QEMU adapter
                          |                        --> runtime-result + logs
@@ -623,9 +624,17 @@ yet execute Lab cases. `.github/workflows/lab.yml` is manual-only and verifies
 that package boundary; ordinary PR, push, scheduled, and release profiles
 cannot invoke it.
 
-Specula currently prepares dry-run or analysis handoffs. It does not execute
-phase gates, import counterexamples, or generate runtime requests. Keep model
-output candidate-only.
+Specula now prepares direct `analyze`, `specgen`, `harness`, and `validate`
+handoffs. It never starts a phase implicitly. Analysis, spec, trace, and
+counterexample-mapping gates copy the required outputs into registered evidence
+and bind every artifact plus the predecessor approval by hash. Downstream
+phases fail closed without the expected approved gate.
+
+`model-import` accepts only an approved restricted counterexample bundle. The
+result is always `engine = specula`, `status = candidate`, and
+`safety_class = model`. The main package still does not expose Specula
+confirmation/classification, runtime reproducer generation, exploitability
+analysis, or finding promotion.
 
 ## Validation commands
 
@@ -683,13 +692,13 @@ the work root below source or source below the work root.
 | change binary export | `runtime/binary.py`, binary schemas, Asterinas initramfs build path | exported bytes equal the Nix output; provenance binds source, toolchain, command, and static ELF evidence |
 | change Linux oracle | `runtime/linux.py`, Linux execution schema, adapter tests | every input hash is rechecked, derived state stays below evidence, and no QEMU child survives |
 | add comparator | oracle comparison schema, one runtime case contract | every compared field has an explicit relation; mismatch remains candidate |
-| extend Specula | `specula.py`, handoff schema, Track readiness | phase artifacts are hash-bound and imported counterexamples remain candidates |
+| extend Specula | `specula.py`, `specula_gates.py`, Specula schemas, Track readiness | every phase consumes the expected predecessor gate; imports remain candidate-only |
 
 ## Next work
 
-1. Add phase-specific Specula execution, hash-bound gates, and candidate-only
-   result import in the model lane.
-2. Start with the FD reservation visibility model, which already has a
+1. Run the FD reservation visibility model through the new phase gates. It has a
    production helper and bounded Loom baseline.
+2. Review and approve one shared FD state machine and Linux-visible contract at
+   the analysis gate before preparing spec generation.
 3. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
    only in the authorization-gated lab.

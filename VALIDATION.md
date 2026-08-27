@@ -14,6 +14,38 @@ Lab boundary and packer shell contracts, Ruff, formatting, Pyright, JSON Schema
 validation, Actionlint, and ShellCheck. `nix run . -- --version` and
 `nix run .#syssec-lab -- --version` both reported `0.4.0`.
 
+## Specula phase-gate foundation
+
+The model lane prepares only direct Specula `analyze`, `specgen`, `harness`,
+and `validate` phases. Analysis, spec, trace, and counterexample-mapping gates
+freeze the required files into registered evidence and recursively verify the
+human approval chain. The normalized importer accepts only the restricted
+counterexample bundle and always emits `engine = specula`,
+`status = candidate`, and `safety_class = model`.
+
+The complete four-gate fixture passed from exact source export through CLI
+candidate import. Discriminating checks also passed:
+
+- changing a frozen gate artifact invalidated the approval;
+- changing the mutable source export invalidated phase preflight;
+- adding a `reproducer` field to a normalized result failed Schema validation;
+- the gate run manifest contained the frozen handoff and model artifacts but
+  excluded the mutable source export.
+
+The complete locked flake gate passed. Its package check ran 165 tests, the
+initramfs packer contract, Ruff, formatting, Pyright, JSON Schema validation,
+Actionlint, and ShellCheck; the Lab package and Lab boundary checks also built.
+
+A real handoff preparation used complete linked checkout
+`1400b3e26bd937c5b516e517b0df824c2ca4955d`, Specula
+`c6aa3dfa41cd4bc7411fae40bd040924c70d9725`, and the real FD-lifecycle
+profile. It was ready with phase `analyze`, no post-dry-run gate, and explicit
+Nix reference
+`github:NixOS/nixpkgs/2c423e03bbafcff28bfadc6781a4a8257f205cb5`.
+The external dry-run script itself was not executed because the environment
+did not authorize its JDK/Maven materialization. This is recorded as NOT RUN,
+not as a Specula execution pass.
+
 ## Post-v0.4 message-header Host extension
 
 Asterinas commit `974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8` moves the

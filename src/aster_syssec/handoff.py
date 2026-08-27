@@ -89,6 +89,31 @@ def validate_specula_agent_config(path: Path) -> None:
         raise ValueError(
             f"Specula agent config references missing profiles: {sorted(unresolved)}"
         )
+    for name, profile in profiles.items():
+        if not isinstance(profile, dict):
+            raise TypeError(f"Specula profile {name!r} must be an object")
+        unknown_profile_keys = set(profile) - {"agent", "model", "effort"}
+        if unknown_profile_keys:
+            raise ValueError(
+                f"Specula profile {name!r} has unknown keys: {sorted(unknown_profile_keys)}"
+            )
+        for key in ("agent", "model", "effort"):
+            if not isinstance(profile.get(key), str) or not profile[key]:
+                raise ValueError(f"Specula profile {name!r} has no non-empty {key!r}")
+
+
+def specula_agent_selection(path: Path, phase: str) -> dict[str, str]:
+    validate_specula_agent_config(path)
+    parsed = json.loads(Path(path).read_text(encoding="utf-8"))
+    phases = parsed["phases"]
+    profile_name = phases.get(phase, phases.get("review", parsed["default_profile"]))
+    profile = parsed["profiles"][profile_name]
+    return {
+        "profile": profile_name,
+        "agent": profile["agent"],
+        "model": profile["model"],
+        "effort": profile["effort"],
+    }
 
 
 def preflight_contract(
@@ -121,7 +146,7 @@ def preflight_contract(
     }
 
 
-def verify_handoff(path: Path) -> dict[str, Any]:
+def verify_handoff(path: Path, *, include_mutable: bool = True) -> dict[str, Any]:
     path = Path(path).resolve()
     try:
         handoff = json.loads(path.read_text(encoding="utf-8"))
@@ -166,4 +191,54 @@ def verify_handoff(path: Path) -> dict[str, Any]:
             raise ValueError(f"handoff input disappeared: {input_path}")
         if file_sha256(input_path) != expected_sha256:
             raise ValueError(f"handoff input changed after preparation: {input_path}")
+
+    if kind == "specula" and include_mutable:
+        artifact_initial = handoff.get("artifact_initial")
+        if not isinstance(artifact_initial, dict) or not isinstance(
+            artifact_initial.get("path"), str
+        ):
+            raise TypeError("Specula handoff has no initial artifact identity")
+        observed_artifact = inspect_source(Path(artifact_initial["path"]))
+        if observed_artifact.revision != artifact_initial.get("revision"):
+            raise ValueError("Specula artifact HEAD changed before phase execution")
+        if observed_artifact.dirty_hash != artifact_initial.get("dirty_hash"):
+            raise ValueError(
+                "Specula artifact working tree changed before phase execution"
+            )
+
+        phase_inputs = handoff.get("phase_inputs")
+        if not isinstance(phase_inputs, list):
+            raise TypeError("Specula handoff phase inputs must be an array")
+        for item in phase_inputs:
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                raise TypeError("invalid Specula phase input identity")
+            input_path = Path(item["path"])
+            if (
+                not input_path.is_file()
+                or input_path.is_symlink()
+                or input_path.stat().st_size != item.get("size")
+                or file_sha256(input_path) != item.get("sha256")
+            ):
+                raise ValueError(
+                    f"Specula phase input changed after preparation: {input_path}"
+                )
+
+        approval = handoff.get("gate_approval")
+        if approval is not None:
+            if not isinstance(approval, dict) or not isinstance(
+                approval.get("path"), str
+            ):
+                raise TypeError("invalid Specula gate approval identity")
+            from .specula_gates import STAGE_REQUIRED_APPROVALS, verify_gate_approval
+
+            expected_gate = STAGE_REQUIRED_APPROVALS.get(handoff.get("stage"))
+            if expected_gate is None:
+                raise ValueError("unexpected Specula gate approval for this stage")
+            verified = verify_gate_approval(
+                Path(approval["path"]), expected_gate=expected_gate
+            )
+            if verified["approval_sha256"] != approval.get("sha256"):
+                raise ValueError("Specula gate approval changed after preparation")
+            if verified["request_sha256"] != approval.get("request_sha256"):
+                raise ValueError("Specula gate request changed after preparation")
     return {"kind": kind, "verified": True, "handoff": str(path)}
