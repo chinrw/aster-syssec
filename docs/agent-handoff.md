@@ -17,7 +17,7 @@ git rev-parse HEAD
 git log --oneline --decorate -12
 git diff --stat origin/main...HEAD
 gh pr list --repo chinrw/aster-syssec --state open --limit 10
-gh pr view 8 --repo chinrw/asterinas
+gh pr view 9 --repo chinrw/asterinas
 gh run list --repo chinrw/aster-syssec --branch main --limit 5
 ```
 
@@ -46,11 +46,11 @@ mismatch is a candidate. No current command promotes a candidate to a finding.
 
 | State | Revision | Scope |
 | --- | --- | --- |
-| merged implementation baseline | `c344f83` | PR #1-#19: v0.4 plus control- and message-header Host Verification |
+| merged implementation baseline | `70b3103` | PR #1-#21: v0.4 plus control-message, message-header, and timespec Host Verification |
 | signed tag `v0.4.0` | `30b5a4d` | v0.4 Host-to-Runtime verification record |
 | signed tag `v0.3.0` | `421c9d9` | v0.3 Host Verification record |
 
-PR #19 is the latest merged implementation PR. PR #9 head
+PR #21 is the latest merged implementation PR. aster-syssec PR #9 head
 `c47ac40e3ae27c4575a539bc6a3a2bbed41518c6` passed `validate` and
 `host-verification`; merge commit `f2f431c47430b308bfec406a54b745fdb89d712b`
 is the first real differential baseline. Later merged heads are:
@@ -67,8 +67,10 @@ is the first real differential baseline. Later merged heads are:
 | #17 | `20336ee` | 16-target control-message Host Verification and workflow pin lock |
 | #18 | `cfa7583` | control-message Host and Runtime evidence receipt |
 | #19 | `95558d5` | 19-target message-header Host Verification and workflow pin lock |
+| #20 | `7c17d3b` | message-header Host and Runtime evidence receipt |
+| #21 | `c0e9311` | 22-target timespec Host Verification and workflow pin lock |
 
-Merge commit `c344f8323db7241ea1a3f412a9ee148426b9cc8f` is the current public
+Merge commit `70b3103dba44f00e74fb3bdf5baf153d03e56055` is the current public
 implementation baseline.
 
 Main push run `32953069193` completed successfully on historical merge commit
@@ -98,6 +100,16 @@ SHA-256 is
 GitHub artifact `9643932986` is 192,236 compressed bytes with archive digest
 `sha256:05ab9198fdb1d797ec2a704f6549e451872844d0d723e611d6cc32730acddefc`.
 
+PR #21 run `33073822346` passed `validate` and the 18-target PR profile. Main
+push run `33074303888` then passed both jobs on merge commit `70b3103...`.
+Manual main run `33075159362` passed the complete 22-target nightly profile.
+Its downloaded Host evidence pack contained 153 files and 1,529,521 bytes;
+every listed file hash and size matched. The independently recomputed content
+SHA-256 is
+`46f18e7e9d7228684981bd6b6b02fcda76206341a3d0645219fcfe093b65240c`.
+GitHub artifact `9647707230` is 213,052 compressed bytes with archive digest
+`sha256:24dca7e8cdbcf0423539c63b71ea6d4b05f370a77521ef783aec1cd4c2ffdb24`.
+
 Both packages and the runtime version are `0.4.0`. Signed annotated tag object
 `a14a73475e56192b499c7470a234bf4c2cc415ae` peels to the v0.4 release
 baseline. The historical `v0.3.0` tag remains unchanged.
@@ -107,8 +119,8 @@ baseline. The historical `v0.3.0` tag remains unchanged.
 `flake.lock` and GitHub Actions pin:
 
 ```text
-974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8
-sha256-Xvq6W1zaDTqpMVh0DltoM6pYNiUcDkyY5bswbH0Mqs8=
+820ec6464809071779f3c386634befcc83da10bc
+sha256-UAenN/jXYpPthwCRWN6ePbbUIKMv7V59ZCOPwk0+BqY=
 ```
 
 The persistent Asterinas seam PRs are merged in `chinrw/asterinas`:
@@ -120,6 +132,7 @@ The persistent Asterinas seam PRs are merged in `chinrw/asterinas`:
 | #4 `syssec-runtime-harness` | `da81ae952e245b6bb60229457f090575c4fe97f6` | isolated guest case runner and partial-EFAULT case |
 | #6 `syssec-cmsg-uapi` | `5e3f8ef5d4b77d5ec276fe9df3c9aa89af8028cb` | checked `cmsghdr` layout/parser seam, Kani, Miri, and fuzz |
 | #8 `syssec-msghdr-uapi` | `974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8` | `user_msghdr` layout, signed name length, iovec bound, Kani, and Miri |
+| #9 `syssec-timespec-uapi` | `820ec6464809071779f3c386634befcc83da10bc` | 64-bit userspace timespec layout, duration ranges, Kani, and Miri |
 
 `chinrw/asterinas` PR #5 merged as
 `fdb34332d9de81d39e5a4cb4c5077446018b27bb`. It adds target-specific static
@@ -136,13 +149,19 @@ and is reachable from `chinrw/asterinas/main`.
 
 `chinrw/asterinas` PR #8 passed all 42 reported checks and merged as
 `d94f69ac8aa62c3b44ee1fc161c6419d6c655b74`. Its signed content head is the
-current aster-syssec pin `974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8` and is
+message-header content revision `974e1bad52e6c6bb9a214c62ff0e16b96c2e6af8` and is
+reachable from `chinrw/asterinas/main`.
+
+`chinrw/asterinas` PR #9 passed all 42 reported checks and merged as
+`2b8472c7673a86fa47c7fa92796228ba739d343e`. Its signed content head is the
+current aster-syssec pin `820ec6464809071779f3c386634befcc83da10bc` and is
 reachable from `chinrw/asterinas/main`.
 
 The current pin descends from the merged runtime stack and adds the control-
-and message-header UAPI seams. Update `flake.lock`, both workflow checkouts,
-checkout preflight, validation evidence, and this snapshot together whenever
-the pin changes. Tests bind both workflow refs to the locked revision.
+and message-header UAPI seams plus the timespec seam. Update `flake.lock`, both
+workflow checkouts, checkout preflight, validation evidence, and this snapshot
+together whenever the pin changes. Tests bind both workflow refs to the locked
+revision.
 
 ## System map
 
@@ -292,24 +311,28 @@ candidate until mapped to source and confirmed on the real kernel.
 
 ## Implemented Host Verification
 
-The registry packages eleven targets:
+The registry packages 22 targets:
 
 | Engine | Targets | Current executed baseline |
 | --- | ---: | --- |
-| Kani | 5 | pass, unwind 8 sufficient |
-| Miri | 1 | pass |
+| Kani | 12 | pass, unwind 8 sufficient |
+| Miri | 4 | pass |
 | layout | 3 | x86-64, RISC-V 64, LoongArch 64 pass |
-| cargo-fuzz | 1 | 1000/1000 runs pass |
+| cargo-fuzz | 2 | 1000/1000 runs pass per target |
 | Loom | 1 | pass at 1000 branches, 3 preemptions, 10000 permutations |
 
-The targets cover `UserIoVec` validation, truncation, address arithmetic,
-layout, the pure iovec helper fuzz surface, and FD reservation visibility.
-Stable expected results are in `docs/v0.3-host-results.json`.
+The targets cover `UserIoVec` validation, truncation, address arithmetic and
+layout; control-message alignment, payload, parser progress, and fuzzing;
+message-header signed name length and iovec bounds; timespec range and layout;
+and FD reservation visibility. Stable v0.3 expected results remain in
+`docs/v0.3-host-results.json`; current results are bound by each profile
+artifact.
 
-PR and push CI run five Kani proofs, Miri, x86-64 layout, and Loom. Scheduled
-or explicitly dispatched nightly CI adds both other layouts and the 1000-run
-fuzz target. Nightly primes the locked fuzz dependencies, then runs offline.
-It does not stop after the first target failure.
+PR and push CI run 12 Kani proofs, four Miri tests, x86-64 layout, and Loom for
+18 blocking targets. Scheduled or explicitly dispatched nightly CI adds both
+other layouts and both 1000-run fuzz targets. Nightly primes the locked fuzz
+dependencies, then runs offline. It does not stop after the first target
+failure.
 
 CI separates cache, build, and evidence roots. `syssec evidence pack` verifies
 every completed or failed run manifest, copies only registered artifacts, and
@@ -441,25 +464,27 @@ hashed artifacts.
 
 The v0.3 Host Verification baseline was executed on clean aster-syssec
 `5f8f38c` and Asterinas `490960ace`. `VALIDATION.md` records the environment
-and result bounds. The current pinned Asterinas revision is `974e1bad...`.
+and result bounds. The current pinned Asterinas revision is `820ec646...`.
 
 The post-v0.4 Host extension passed clean local PR and nightly profiles on
-Asterinas `974e1bad...`. The current registry contains ten Kani, three Miri,
-three layout, two fuzz, and one Loom target. PR #19 run `33062684112` passed
+Asterinas `820ec646...`. The current registry contains twelve Kani, four Miri,
+three layout, two fuzz, and one Loom target. PR #21 run `33073822346` passed
 both remote jobs after the Host and Runtime workflow refs were bound to
-`flake.lock`. Main run `33066250182` then passed the complete 19-target nightly
-profile and produced the independently verified evidence pack recorded above.
+`flake.lock`. Main push run `33074303888` passed both jobs. Manual main run
+`33075159362` then passed the complete 22-target nightly profile and produced
+the independently verified evidence pack recorded above. Its profile SHA-256
+is `12fa2368e673eef81ce78b9d4bf9a107eb6fd94b5d85b1e0315c8e9cebf9577f`.
 
-Manual Runtime run `33066252308` passed all four stages on merged main and the
-same Asterinas pin. Pipeline `RUNTIME-PIPELINE-0304FD0DA7CE9812` produced normal
-Asterinas and Linux results for the exact `696ed3...7089` static binary.
-Comparison `ORACLE-COMPARISON-145A977B01CEA804` matched all seven declared
+Manual Runtime run `33075155261` passed all four stages on merged main and the
+same Asterinas pin. Pipeline `RUNTIME-PIPELINE-6CDABEF04FBB6E5C` produced
+normal Asterinas and Linux results for the exact `696ed3...7089` static binary.
+Comparison `ORACLE-COMPARISON-F4A8F607F68060FB` matched all seven declared
 fields and retained `disposition=baseline`. The verified evidence pack retained
-32 files and 16,524,605 bytes with content SHA-256
-`42ef5822be32e1446fc777f86fedd4d45c94a10e145192cf6ef14bea5022d377`.
+32 files and 16,524,703 bytes with content SHA-256
+`b2d2504dc68e1912351370dcfc8a626892cd6efa266e007e28dab08979c8ab65`.
 Runtime execution and evidence packing used Nix offline and recorded no
-downloads or Nix-store copies. Six result artifacts and the run manifest passed
-their pinned schema and integrity checks after download.
+downloads or Nix-store copies. Nine primary Runtime artifacts and the run
+manifest passed their pinned schema and integrity checks after download.
 `docs/runtime-baseline-2026-08-27.md` binds the inputs, stage results,
 provenance, comparison, and downloaded artifact hashes.
 
@@ -607,8 +632,8 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Extend low-risk ABI helpers and targets: timespec ranges, sigset size, and
-   mmap/mremap range arithmetic.
+1. Extend low-risk ABI helpers and targets: sigset size, then mmap/mremap range
+   arithmetic. The timespec range/layout seam is complete at the current pin.
 2. Add phase-specific Specula execution, hash-bound gates, and candidate-only
    result import in the model lane.
 3. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
