@@ -327,8 +327,10 @@ Evidence layout:
     └── qemu.log
 ```
 
-There is no runtime CLI or runtime profile yet. The Asterinas adapter does not
-run the Linux oracle.
+The explicit Runtime CLI provides target listing, checkout preflight, and the
+`partial-efault-baseline` opt-in profile. It executes export, Asterinas, Linux,
+and comparison as separate hash-bound stages. Runtime is not part of ordinary
+PR or nightly profiles.
 
 The Linux adapter seam is:
 
@@ -495,11 +497,10 @@ the work root below source or source below the work root.
 
 ## Next work
 
-1. Register runtime targets and expose execution through an explicit CLI/profile.
-2. Reproduce the runtime baseline in CI and retain a verified evidence pack.
-3. Extend low-risk ABI helpers and targets: message headers, control-message
+1. Reproduce the runtime baseline in CI and retain a verified evidence pack.
+2. Extend low-risk ABI helpers and targets: message headers, control-message
    alignment/parser progress, timespec ranges, sigset size, and mmap arithmetic.
-4. Add phase-specific Specula execution, hash-bound gates, and candidate-only
+3. Add phase-specific Specula execution, hash-bound gates, and candidate-only
    result import in the model lane.
-5. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
+4. Add fault, pause, sequence-fuzz, confirmation, and finding-promotion work
    only in the authorization-gated lab.

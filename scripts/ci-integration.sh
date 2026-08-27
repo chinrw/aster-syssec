@@ -20,3 +20,7 @@ PYTHONPATH="$project_root/src" python3 -m aster_syssec inventory \
 PYTHONPATH="$project_root/src" python3 -m aster_syssec targets check \
     --asterinas "$ASTERINAS_PINNED_SOURCE" \
     --work-root "$SYSSEC_WORK_ROOT"
+
+PYTHONPATH="$project_root/src" python3 -m aster_syssec runtime targets check \
+    --asterinas "$ASTERINAS_PINNED_SOURCE" \
+    --work-root "$SYSSEC_WORK_ROOT"

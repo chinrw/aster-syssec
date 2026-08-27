@@ -110,6 +110,41 @@ class RunContextTests(unittest.TestCase):
                     schema="finding.schema.json",
                 )
 
+    def test_external_json_artifact_retains_its_schema_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            source = write_fixture(base / "source")
+            run = RunContext.start(
+                work_root=base / "work",
+                command="runtime-pipeline",
+                source_root=source,
+                registry=load_registry(),
+                parameters={},
+            )
+            external = run.root / "runtime/targets-check.json"
+            external.parent.mkdir(parents=True)
+            external.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "status": "ok",
+                        "target_registry_hash": "a" * 64,
+                        "targets": 1,
+                        "issues": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            run.register_json_artifact(external, schema="target-check.schema.json")
+            run.complete()
+            manifest = json.loads(run.manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            manifest["outputs"][0]["schema"],
+            "https://asterinas.dev/syssec/target-check.schema.json",
+        )
+
     def test_run_cannot_transition_after_completion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

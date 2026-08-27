@@ -42,10 +42,10 @@ targets require their matching production helper packages in the Asterinas
 checkout; `targets check` fails before execution when the package, symbol,
 harness, test, or fuzz target is absent.
 
-The current CLI does not orchestrate Runtime targets, execute Lab cases, run
-kernel sequence fuzzing, enforce Specula phase gates, or promote findings.
-Engine and runtime results remain evidence inputs and cannot become confirmed
-findings through the current CLI.
+The current CLI does not execute Lab cases, run kernel sequence fuzzing,
+enforce Specula phase gates, or promote findings. Engine and runtime results
+remain evidence inputs and cannot become confirmed findings through the current
+CLI.
 
 ## Install
 
@@ -210,10 +210,9 @@ syssec run \
 `external_required` entries remain explicit gaps in `profile/result.json`; the
 orchestrator does not report them as executed.
 
-## Runtime adapters
+## Runtime pipeline
 
-Runtime execution is available as library seams and is not registered in the
-CLI or default profiles:
+The adapters remain reusable library seams:
 
 ```python
 AsterinasQemuAdapter(...).execute(request)
@@ -227,6 +226,36 @@ PartialEfaultComparator().compare(
     output_path=...,
 )
 ```
+
+The explicit Runtime registry composes those seams without adding the pipeline
+to ordinary PR or nightly profiles:
+
+```sh
+syssec runtime targets list
+syssec runtime targets check \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT"
+
+syssec runtime run \
+  --profile partial-efault-baseline \
+  --asterinas "$ASTERINAS_REPO" \
+  --work-root "$SYSSEC_WORK_ROOT" \
+  --oracle-metadata /path/to/oracle-image.json \
+  --initramfs-packer /path/to/syssec-initramfs-packer
+```
+
+The profile resolves exactly one target and executes four stages:
+
+```text
+export-binary → run-asterinas → run-linux → compare
+```
+
+Each stage retains a schema identity and SHA-256 in
+`runtime-pipeline-result.json`. The exported binary is checked before and after
+both VM runs. Linux injects those exact bytes without recompilation; the
+Asterinas boot build must reproduce the same bytes inside its initramfs or the
+adapter fails. Target/profile class mismatches, source drift, oracle mismatch,
+changed artifacts, and unsupported comparators fail before a result can pass.
 
 The Linux adapter verifies the runtime request, oracle metadata, kernel config,
 kernel image, base rootfs, QEMU identity, and exported static binary before

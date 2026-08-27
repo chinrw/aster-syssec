@@ -10,8 +10,8 @@
     "LINUX-ABI-CONTRACT"
   ],
   "source_symbols": [
-    "SYS_read",
-    "readv"
+    "SYS_READ",
+    "sys_read"
   ],
   "safety": {
     "class": "core",
@@ -23,6 +23,7 @@
   "oracle": "linux-x86-64-6-18-45",
   "comparator": "partial-efault-pipe-read-v1",
   "limits": {
+    "build_timeout_seconds": 1800,
     "boot_timeout_seconds": 300,
     "test_timeout_seconds": 30,
     "output_bytes": 1048576,

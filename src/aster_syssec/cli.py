@@ -30,6 +30,21 @@ from .reporting import (
     review_markdown,
 )
 from .runs import RunContext
+from .runtime import (
+    AsterinasQemuAdapter,
+    AsterinasStaticBinaryExporter,
+    LinuxOracleAdapter,
+    PartialEfaultComparator,
+    RuntimePipeline,
+)
+from .runtime.targets import (
+    RuntimeProfile,
+    RuntimeTarget,
+    RuntimeTargetRegistry,
+    load_runtime_profile_registry,
+    load_runtime_target_registry,
+    validate_runtime_targets_against_checkout,
+)
 from .safety import (
     require_core_class,
     require_core_execution,
@@ -222,6 +237,51 @@ def build_parser() -> argparse.ArgumentParser:
     run_profile.add_argument("--baseline", type=Path)
     run_profile.add_argument("--json", action="store_true")
     run_profile.set_defaults(handler=_run_profile)
+
+    runtime = subparsers.add_parser(
+        "runtime", help="inspect and execute explicit Runtime verification targets"
+    )
+    runtime_commands = runtime.add_subparsers(dest="runtime_command", required=True)
+    runtime_targets = runtime_commands.add_parser(
+        "targets", help="inspect configured Runtime targets"
+    )
+    runtime_target_commands = runtime_targets.add_subparsers(
+        dest="runtime_target_command", required=True
+    )
+    runtime_targets_list = runtime_target_commands.add_parser(
+        "list", help="list validated Runtime targets"
+    )
+    runtime_targets_list.add_argument("--config-root", type=Path)
+    runtime_targets_list.add_argument("--runtime-target-root", type=Path)
+    runtime_targets_list.add_argument("--json", action="store_true")
+    runtime_targets_list.set_defaults(handler=_runtime_targets_list)
+    runtime_targets_check = runtime_target_commands.add_parser(
+        "check", help="validate Runtime targets against an Asterinas checkout"
+    )
+    _add_source_options(runtime_targets_check)
+    runtime_targets_check.add_argument("--runtime-target-root", type=Path)
+    runtime_targets_check.add_argument("--json", action="store_true")
+    runtime_targets_check.set_defaults(handler=_runtime_targets_check)
+
+    runtime_run = runtime_commands.add_parser(
+        "run", help="execute one hash-bound Runtime target pipeline"
+    )
+    _add_source_options(runtime_run)
+    runtime_selection = runtime_run.add_mutually_exclusive_group(required=True)
+    runtime_selection.add_argument("--target")
+    runtime_selection.add_argument("--profile")
+    runtime_run.add_argument("--runtime-target-root", type=Path)
+    runtime_run.add_argument("--runtime-profile-config", type=Path)
+    runtime_run.add_argument("--oracle-metadata", required=True, type=Path)
+    runtime_run.add_argument("--initramfs-packer", required=True)
+    runtime_run.add_argument("--export-make-executable", default="make")
+    runtime_run.add_argument("--asterinas-make-executable", default="make")
+    runtime_run.add_argument("--nix-executable", default="nix")
+    runtime_run.add_argument("--nix-store-executable", default="nix-store")
+    runtime_run.add_argument("--readelf-executable", default="readelf")
+    runtime_run.add_argument("--cargo-osdk-executable")
+    runtime_run.add_argument("--json", action="store_true")
+    runtime_run.set_defaults(handler=_runtime_run)
 
     evidence = subparsers.add_parser(
         "evidence", help="verify and package registered run evidence"
@@ -916,6 +976,172 @@ def _profile_summary_text(result: dict[str, Any], run_root: Path) -> str:
     if result["failed_targets"]:
         lines.append(f"failed targets: {', '.join(result['failed_targets'])}")
     return "\n".join(lines)
+
+
+def _runtime_targets_list(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    targets = load_runtime_target_registry(registry, args.runtime_target_root)
+    values = [target.summary() for target in targets.targets.values()]
+    if args.json:
+        print(json.dumps(values, indent=2, sort_keys=True))
+    else:
+        for target in targets.targets.values():
+            print(
+                f"{target.id}: {target.track} "
+                f"safety={target.safety.safety_class.value} "
+                f"oracle={target.oracle} expected={target.expected}"
+            )
+    return 0
+
+
+def _runtime_targets_check(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    targets = load_runtime_target_registry(registry, args.runtime_target_root)
+    run = _start_run(
+        args,
+        registry,
+        "runtime-targets-check",
+        {
+            "runtime_target_root": _optional_path(args.runtime_target_root),
+            "runtime_target_registry_hash": targets.config_hash,
+        },
+    )
+    try:
+        ensure_asterinas_checkout(args.asterinas)
+        issues = validate_runtime_targets_against_checkout(
+            targets,
+            registry,
+            args.asterinas,
+        )
+        result = {
+            "schema_version": 1,
+            "status": "fail" if issues else "ok",
+            "target_registry_hash": targets.config_hash,
+            "targets": len(targets.targets),
+            "issues": [item.__dict__ for item in issues],
+        }
+        output = run.write_json(
+            "runtime/targets/check.json",
+            result,
+            schema="target-check.schema.json",
+        )
+        run.complete([output])
+    except BaseException as error:
+        run.fail(error)
+        raise
+    _print_result(
+        args.json,
+        result,
+        f"Runtime targets check: {result['status']}, {len(issues)} issues; run={run.root}",
+    )
+    return 1 if issues else 0
+
+
+def _runtime_run(args: argparse.Namespace) -> int:
+    registry = load_registry(args.config_root)
+    targets = load_runtime_target_registry(registry, args.runtime_target_root)
+    target, profile, profile_config_sha256 = _runtime_selection(args, targets)
+    require_core_execution(target.safety, operation="Runtime run")
+    comparator = _runtime_comparator(target)
+    work_root = _work_root(args.work_root)
+    run = RunContext.start(
+        work_root=work_root,
+        command="runtime-pipeline",
+        source_root=args.asterinas,
+        registry=registry,
+        parameters={
+            "target": target.id,
+            "profile": profile.id if profile is not None else None,
+            "target_config_sha256": target.config_sha256,
+            "runtime_target_registry_hash": targets.config_hash,
+            "runtime_profile_config_sha256": profile_config_sha256,
+            "oracle_metadata": str(args.oracle_metadata.resolve()),
+            "initramfs_packer": args.initramfs_packer,
+            "export_make_executable": args.export_make_executable,
+            "asterinas_make_executable": args.asterinas_make_executable,
+            "safety_class": target.safety.safety_class.value,
+        },
+    )
+    try:
+        ensure_asterinas_checkout(args.asterinas)
+        issues = tuple(
+            issue
+            for issue in validate_runtime_targets_against_checkout(
+                targets,
+                registry,
+                args.asterinas,
+            )
+            if issue.target == target.id
+        )
+        if issues:
+            detail = "; ".join(issue.detail for issue in issues)
+            raise ValueError(f"Runtime target {target.id} is not executable: {detail}")
+        pipeline = RuntimePipeline(
+            exporter=AsterinasStaticBinaryExporter(
+                make_executable=args.export_make_executable,
+                nix_executable=args.nix_executable,
+                nix_store_executable=args.nix_store_executable,
+                readelf_executable=args.readelf_executable,
+            ),
+            asterinas_adapter=AsterinasQemuAdapter(
+                make_executable=args.asterinas_make_executable,
+                cargo_osdk_executable=args.cargo_osdk_executable,
+            ),
+            linux_adapter=LinuxOracleAdapter(
+                oracle_metadata_path=args.oracle_metadata,
+                initramfs_packer_executable=args.initramfs_packer,
+            ),
+            comparator=comparator,
+        )
+        result = pipeline.execute(
+            target=target,
+            profile_id=profile.id if profile is not None else None,
+            runtime_registry_hash=targets.config_hash,
+            source_root=args.asterinas,
+            oracle_metadata_path=args.oracle_metadata,
+            run=run,
+        )
+        run.complete()
+    except BaseException as error:
+        run.fail(error)
+        raise
+    summary = {"run": str(run.root), **result}
+    _print_result(
+        args.json,
+        summary,
+        (
+            f"Runtime run: {target.id} status={result['status']} "
+            f"observed={result['observed']}; run={run.root}"
+        ),
+    )
+    return 0 if result["expectation_met"] else 1
+
+
+def _runtime_selection(
+    args: argparse.Namespace,
+    targets: RuntimeTargetRegistry,
+) -> tuple[RuntimeTarget, RuntimeProfile | None, str | None]:
+    if args.profile is None:
+        if args.runtime_profile_config is not None:
+            raise ValueError("--runtime-profile-config requires --profile")
+        target = targets.require(args.target)
+        return target, None, None
+    profiles = load_runtime_profile_registry(args.runtime_profile_config)
+    profile = profiles.require(args.profile)
+    require_core_class(profile.safety_class, operation="Runtime profile")
+    target = targets.require(profile.target)
+    require_profile_target_safety(
+        profile_class=profile.safety_class,
+        target_id=target.id,
+        target_policy=target.safety,
+    )
+    return target, profile, profiles.config_sha256
+
+
+def _runtime_comparator(target: RuntimeTarget) -> PartialEfaultComparator:
+    if target.comparator != "partial-efault-pipe-read-v1":
+        raise ValueError(f"unsupported Runtime comparator: {target.comparator}")
+    return PartialEfaultComparator()
 
 
 def _evidence_pack(args: argparse.Namespace) -> int:

@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/runtime-pipeline-result.schema.json",
+  "title": "aster-syssec Runtime pipeline result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "pipeline_id",
+    "finished_at",
+    "target",
+    "profile",
+    "target_config_sha256",
+    "safety_class",
+    "status",
+    "expected",
+    "observed",
+    "expectation_met",
+    "binary_sha256",
+    "comparison_id",
+    "disposition",
+    "stages"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "pipeline_id": {
+      "type": "string",
+      "pattern": "^RUNTIME-PIPELINE-[0-9A-F]{16}$"
+    },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "target": { "type": "string", "minLength": 1 },
+    "profile": { "type": ["string", "null"] },
+    "target_config_sha256": { "$ref": "#/$defs/sha256" },
+    "safety_class": { "const": "core" },
+    "status": { "enum": ["pass", "fail"] },
+    "expected": { "const": "match" },
+    "observed": { "enum": ["match", "mismatch", "incomplete"] },
+    "expectation_met": { "type": "boolean" },
+    "binary_sha256": { "$ref": "#/$defs/sha256" },
+    "comparison_id": {
+      "type": "string",
+      "pattern": "^ORACLE-COMPARISON-[0-9A-F]{16}$"
+    },
+    "disposition": { "enum": ["baseline", "candidate", "incomplete"] },
+    "stages": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/export_stage" },
+        { "$ref": "#/$defs/asterinas_stage" },
+        { "$ref": "#/$defs/linux_stage" },
+        { "$ref": "#/$defs/compare_stage" }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "pass" } } },
+      "then": {
+        "properties": {
+          "observed": { "const": "match" },
+          "expectation_met": { "const": true },
+          "disposition": { "const": "baseline" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "fail" } } },
+      "then": { "properties": { "expectation_met": { "const": false } } }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema", "schema_sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "schema": { "type": "string", "format": "uri" },
+        "schema_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "artifact"],
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "const": "pass" },
+        "artifact": { "$ref": "#/$defs/artifact" }
+      }
+    },
+    "export_stage": {
+      "allOf": [
+        { "$ref": "#/$defs/stage" },
+        { "properties": { "name": { "const": "export-binary" } } }
+      ]
+    },
+    "asterinas_stage": {
+      "allOf": [
+        { "$ref": "#/$defs/stage" },
+        { "properties": { "name": { "const": "run-asterinas" } } }
+      ]
+    },
+    "linux_stage": {
+      "allOf": [
+        { "$ref": "#/$defs/stage" },
+        { "properties": { "name": { "const": "run-linux" } } }
+      ]
+    },
+    "compare_stage": {
+      "allOf": [
+        { "$ref": "#/$defs/stage" },
+        { "properties": { "name": { "const": "compare" } } }
+      ]
+    }
+  }
+}

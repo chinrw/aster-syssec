@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asterinas.dev/syssec/runtime-pipeline-plan.schema.json",
+  "title": "aster-syssec Runtime pipeline plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "pipeline_id",
+    "created_at",
+    "target",
+    "profile",
+    "target_config",
+    "target_config_sha256",
+    "runtime_registry_hash",
+    "safety_class",
+    "source",
+    "oracle",
+    "stages",
+    "expected"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "pipeline_id": {
+      "type": "string",
+      "pattern": "^RUNTIME-PIPELINE-[0-9A-F]{16}$"
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "target": { "type": "string", "minLength": 1 },
+    "profile": { "type": ["string", "null"] },
+    "target_config": { "$ref": "#/$defs/artifact" },
+    "target_config_sha256": { "$ref": "#/$defs/sha256" },
+    "runtime_registry_hash": { "$ref": "#/$defs/sha256" },
+    "safety_class": { "const": "core" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "revision", "dirty_hash"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 1 },
+        "dirty_hash": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "metadata_path", "metadata_sha256"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "metadata_path": { "type": "string", "minLength": 1 },
+        "metadata_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "stages": {
+      "const": ["export-binary", "run-asterinas", "run-linux", "compare"]
+    },
+    "expected": { "const": "match" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema", "schema_sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "schema": { "type": "string", "format": "uri" },
+        "schema_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

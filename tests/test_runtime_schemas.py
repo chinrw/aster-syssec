@@ -61,7 +61,7 @@ class RuntimeSchemaTests(unittest.TestCase):
                 "PARTIAL-PROGRESS-CONSISTENCY",
                 "LINUX-ABI-CONTRACT",
             ],
-            "source_symbols": ["SYS_read", "readv"],
+            "source_symbols": ["SYS_READ", "sys_read"],
             "safety": {
                 "class": "core",
                 "agent_mode": "allowed",
@@ -72,6 +72,7 @@ class RuntimeSchemaTests(unittest.TestCase):
             "oracle": "linux-x86-64",
             "comparator": "partial-efault-pipe-read-v1",
             "limits": {
+                "build_timeout_seconds": 600,
                 "boot_timeout_seconds": 120,
                 "test_timeout_seconds": 30,
                 "output_bytes": 1024 * 1024,
